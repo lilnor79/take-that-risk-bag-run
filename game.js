@@ -7,11 +7,12 @@ const views=['start','decision','end','leader','celebrate','shop'];let phase='st
 const stick={active:false,id:null,x:0,y:0,dx:0,dy:0,vx:0,vy:0};
 const STICK_RADIUS=47,STICK_DEADZONE=5;
 let joystickSide=localStorage.getItem('bag_joystick_side')==='right'?'right':'left';
+let controlMode=localStorage.getItem('bag_control_mode')==='free'?'free':'joystick';
 function placeStick(){stick.x=joystickSide==='right'?W-64:64;stick.y=H-150;}
 placeStick();
 function resetStick(){stick.active=false;stick.id=null;stick.dx=stick.dy=stick.vx=stick.vy=0;}
 function drawStick(){
- if(phase!=='playing')return;
+ if(phase!=='playing'||controlMode==='free')return;
  ctx.save();ctx.lineWidth=3;
  ctx.fillStyle='rgba(10,22,16,.62)';ctx.strokeStyle='rgba(109,255,158,.84)';
  ctx.shadowColor='rgba(27,241,100,.48)';ctx.shadowBlur=12;
@@ -24,7 +25,7 @@ function drawStick(){
  ctx.restore();
 }
 const fmt=n=>'$'+Math.floor(n).toLocaleString('en-US');
-const GAME_BUILD='JOYSTICK-AND-SLIDERS-V28';
+const GAME_BUILD='FREE-HAND-AND-JOYSTICK-V29';
 const SHOP_PRICES={character:[0,250000,500000,1000000,2000000],map:[0,350000,750000,1500000,3000000]};
 function shopPrice(tab,index){return SHOP_PRICES[tab][index]??Infinity;}
 const CHARACTERS=[{name:'Original Runner',coat:'#383838',hat:'#080808',pants:'#292929'},{name:'Redline',coat:'#922d32',hat:'#1b1010',pants:'#292929'},{name:'Ghost',coat:'#d1d4dc',hat:'#f0f0f0',pants:'#575d66'},{name:'Gold Rush',coat:'#9c7834',hat:'#21190a',pants:'#443822'},{name:'Night Ops',coat:'#244d3d',hat:'#090f0d',pants:'#182f26'}];
@@ -182,14 +183,14 @@ canvas.addEventListener('pointerdown',e=>{
  if(phase!=='playing'||stick.active)return;
  e.preventDefault();const p=pointer(e);stick.active=true;stick.id=e.pointerId;
  // Only begin movement from the visible joystick; its location never jumps.
- if(Math.hypot(p.x-stick.x,p.y-stick.y)>STICK_RADIUS+25){resetStick();return;}
+ if(controlMode==='free'){stick.x=p.x;stick.y=p.y;}else if(Math.hypot(p.x-stick.x,p.y-stick.y)>STICK_RADIUS+25){resetStick();return;}
  stick.dx=stick.dy=stick.vx=stick.vy=0;target=null;
  moveStick(e);canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointermove',e=>{
  if(stick.active&&e.pointerId===stick.id){e.preventDefault();moveStick(e)}
 });
-function releaseStick(e){if(stick.active&&e.pointerId===stick.id){resetStick();target=null}}
+function releaseStick(e){if(stick.active&&e.pointerId===stick.id){resetStick();placeStick();target=null}}
 canvas.addEventListener('pointerup',releaseStick);
 canvas.addEventListener('pointercancel',releaseStick);
 canvas.addEventListener('lostpointercapture',releaseStick);
@@ -200,7 +201,7 @@ movementMultiplier=Math.max(.6,Math.min(2.4,movementMultiplier));
 // Cosmetic shop. Unlocks are saved on this device; no real-money purchases.
 let shopReturn='start',shopTab='character',pendingItem=null;
 const shopCSS=document.createElement('style');shopCSS.textContent=`
-#bagShopButton{position:absolute;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:10018;width:46px;height:46px;border-radius:17px;border:2px solid #c9a04e;background:linear-gradient(135deg,#47331c,#151515);color:white;font-size:24px;padding:0;box-shadow:0 0 16px #f5b94a70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+#bagShopButton{position:absolute;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:10018;width:46px;height:46px;border-radius:17px;border:2px solid #c9a04e;background:linear-gradient(135deg,#47331c,#151515);color:white;font-size:24px;padding:0;box-shadow:0 0 16px #f5b94a70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
 #bagShopButton span{font-size:8px;letter-spacing:1px;color:#ffe0a1}
 #shop{z-index:10021;justify-content:flex-start;overflow-y:auto;padding-top:calc(24px + env(safe-area-inset-top));gap:12px}
 #shop .shopTabs{display:flex;width:100%;max-width:360px;gap:7px}#shop .shopTabs button{flex:1;background:#303030;color:#fff;padding:11px 4px;border:1px solid #666}
@@ -227,9 +228,10 @@ if(db){const {data:{session},error:sessionError}=await db.auth.getSession();if(s
 const {tab,index}=pendingItem;if(tab==='character'){ownedChars=[...new Set([...ownedChars,index])];activeChar=index;localStorage.setItem('bag_owned_chars',JSON.stringify(ownedChars));localStorage.setItem('bag_active_char',String(index))}else{ownedMaps=[...new Set([...ownedMaps,index])];activeMap=index;localStorage.setItem('bag_owned_maps',JSON.stringify(ownedMaps));localStorage.setItem('bag_active_map',String(index))}localStorage.removeItem('bag_best');confirmScreen.style.display='none';pendingItem=null;begin();
 }catch(e){confirmScreen.style.display='none';$('shopNotice').textContent='Purchase canceled: '+e.message+'. Your money was not spent.'}finally{button.disabled=false;button.textContent='UNLOCK & RESTART'}};
 
+const footerStyle=document.createElement('style');footerStyle.textContent='#game{height:calc(100% - 190px)!important}#app{background:#090909}';document.head.appendChild(footerStyle);
 const settingsStyle=document.createElement('style');
 settingsStyle.textContent=`
-#bagSettingsButton{position:absolute;left:14px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:10020;width:46px;height:46px;padding:0;display:flex;align-items:center;justify-content:center;line-height:1;border:1px solid #666;border-radius:50%;background:#171717;color:#fff;font-size:30px;font-weight:400;cursor:pointer;box-shadow:0 2px 9px #0008}
+#bagSettingsButton{position:absolute;left:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:10020;width:46px;height:46px;padding:0;display:flex;align-items:center;justify-content:center;line-height:1;border:1px solid #666;border-radius:50%;background:#171717;color:#fff;font-size:30px;font-weight:400;cursor:pointer;box-shadow:0 2px 9px #0008}
 #bagSettingsBackdrop{position:absolute;inset:0;z-index:10019;background:#000b;display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}
 #bagSettingsBackdrop.open{display:flex}
 #bagSettingsPanel{width:min(370px,100%);max-height:85vh;overflow:auto;background:#151515;border:1px solid #666;border-radius:18px;color:#fff;padding:22px;box-sizing:border-box;font-family:Arial,sans-serif;box-shadow:0 12px 45px #000}
@@ -243,16 +245,18 @@ settingsStyle.textContent=`
 #bagSettingsAudio{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
 #bagSettingsAudio button{font-size:20px;padding:8px 12px;border-radius:10px;background:#333;color:white;border:1px solid #777}
 #bagSettingsAudio .bagSliderWrap{flex:1;min-width:100px}#bagSettingsAudio input[type=range]{flex:1;min-width:90px;width:auto!important;margin:12px 0}#bagSettingsPanel input[type=range]::-webkit-slider-thumb{background-position:center center!important}
-#bagJoystickSides{display:flex;gap:10px}#bagJoystickSides button{flex:1;background:#252525;color:white;border:1px solid #555;border-radius:10px;padding:12px;font-weight:800}#bagJoystickSides button.selected{background:#105b30;border-color:#3bff89;box-shadow:0 0 10px #12a74b88}#bagSettingsClose{width:100%;margin-top:22px;padding:12px;border-radius:11px;border:0;background:#f0f0f0;color:#111;font-weight:bold;font-size:16px}
+#bagControlModes{display:flex;gap:10px;margin-bottom:6px}#bagControlModes button{flex:1;background:#252525;color:white;border:1px solid #555;border-radius:10px;padding:12px 7px;font-size:13px;font-weight:800}#bagControlModes button.selected{background:#105b30;border-color:#3bff89;box-shadow:0 0 10px #12a74b88}#bagJoystickSides{display:flex;gap:10px}#bagJoystickSides button{flex:1;background:#252525;color:white;border:1px solid #555;border-radius:10px;padding:12px;font-weight:800}#bagJoystickSides button.selected{background:#105b30;border-color:#3bff89;box-shadow:0 0 10px #12a74b88}#bagSettingsClose{width:100%;margin-top:22px;padding:12px;border-radius:11px;border:0;background:#f0f0f0;color:#111;font-weight:bold;font-size:16px}
 `;
 document.head.appendChild(settingsStyle);
 const settingsButton=document.createElement('button');settingsButton.id='bagSettingsButton';settingsButton.type='button';settingsButton.textContent='⚙';settingsButton.setAttribute('aria-label','Open settings');
 const settingsBackdrop=document.createElement('div');settingsBackdrop.id='bagSettingsBackdrop';
-settingsBackdrop.innerHTML='<div id="bagSettingsPanel" role="dialog" aria-modal="true" aria-label="Game settings"><h2>⚙ SETTINGS <span style="font-size:11px;color:#69f79b;vertical-align:middle">V28</span></h2><div class="bagSettingLabel"><span>Movement Speed</span><strong id="bagSpeedPct"></strong></div><input id="bagSpeed" aria-label="Movement speed" type="range" min="60" max="240" step="5"><div class="bagSettingLabel"><span>Joystick Side</span></div><div id="bagJoystickSides" role="group" aria-label="Joystick side"><button type="button" data-side="left">◀ LEFT</button><button type="button" data-side="right">RIGHT ▶</button></div><div class="bagSettingLabel"><span>Music Volume</span></div><div id="bagSettingsAudio"></div><button type="button" id="bagSettingsClose">BACK TO GAME</button></div>';
+settingsBackdrop.innerHTML='<div id="bagSettingsPanel" role="dialog" aria-modal="true" aria-label="Game settings"><h2>⚙ SETTINGS <span style="font-size:11px;color:#69f79b;vertical-align:middle">V29</span></h2><div class="bagSettingLabel"><span>Movement Speed</span><strong id="bagSpeedPct"></strong></div><input id="bagSpeed" aria-label="Movement speed" type="range" min="60" max="240" step="5"><div class="bagSettingLabel"><span>Control Style</span></div><div id="bagControlModes" role="group" aria-label="Movement control style"><button type="button" data-mode="joystick">🕹 JOYSTICK</button><button type="button" data-mode="free">👆 FREE HAND</button></div><div id="bagJoystickSection"><div class="bagSettingLabel"><span>Joystick Side</span></div><div id="bagJoystickSides" role="group" aria-label="Joystick side"><button type="button" data-side="left">◀ LEFT</button><button type="button" data-side="right">RIGHT ▶</button></div></div><div class="bagSettingLabel"><span>Music Volume</span></div><div id="bagSettingsAudio"></div><button type="button" id="bagSettingsClose">BACK TO GAME</button></div>';
 $('app').append(settingsButton,settingsBackdrop);
 const speedControl=$('bagSpeed'),speedPct=$('bagSpeedPct');
 function syncJoystickSide(){document.querySelectorAll('#bagJoystickSides button').forEach(b=>{b.classList.toggle('selected',b.dataset.side===joystickSide);b.setAttribute('aria-pressed',String(b.dataset.side===joystickSide))});placeStick();resetStick();}
 document.querySelectorAll('#bagJoystickSides button').forEach(b=>b.addEventListener('click',()=>{joystickSide=b.dataset.side;localStorage.setItem('bag_joystick_side',joystickSide);syncJoystickSide()}));syncJoystickSide();
+function syncControlMode(){document.querySelectorAll('#bagControlModes button').forEach(b=>{b.classList.toggle('selected',b.dataset.mode===controlMode);b.setAttribute('aria-pressed',String(b.dataset.mode===controlMode))});$('bagJoystickSection').style.display=controlMode==='joystick'?'block':'none';resetStick();placeStick();}
+document.querySelectorAll('#bagControlModes button').forEach(b=>b.addEventListener('click',()=>{controlMode=b.dataset.mode;localStorage.setItem('bag_control_mode',controlMode);syncControlMode()}));syncControlMode();
 function syncSpeed(){speedControl.value=String(Math.round(movementMultiplier*100));speedPct.textContent=Math.round(movementMultiplier*100)+'%'}
 speedControl.addEventListener('input',()=>{movementMultiplier=Number(speedControl.value)/100;localStorage.setItem('bag_movement_speed',String(movementMultiplier));syncSpeed()});syncSpeed();
 settingsButton.onclick=()=>settingsBackdrop.classList.add('open');
@@ -267,7 +271,7 @@ slider.addEventListener('input',()=>{ensureAudioGain();if(audioContext&&audioCon
 // Home navigation: confirmation protects active runs, and banked runs can be submitted later.
 let homeOrigin='start',homeSavedScore=0;
 const homeStyle=document.createElement('style');homeStyle.textContent=`
-#bagHomeButton{position:absolute;right:72px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:10017;width:46px;height:46px;padding:0;border:2px solid #7cba90;border-radius:15px;background:linear-gradient(135deg,#224b35,#111);box-shadow:0 0 14px #55de8c65;color:white;font-size:21px;display:none;align-items:center;justify-content:center}
+#bagHomeButton{position:absolute;right:72px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:10017;width:46px;height:46px;padding:0;border:2px solid #7cba90;border-radius:15px;background:linear-gradient(135deg,#224b35,#111);box-shadow:0 0 14px #55de8c65;color:white;font-size:21px;display:none;align-items:center;justify-content:center}
 #bagHomeButton.show{display:flex}
 #bagHomeDialog{position:absolute;inset:0;z-index:10025;background:#000d;display:none;align-items:center;justify-content:center;padding:22px}
 #bagHomeDialog.open{display:flex}
