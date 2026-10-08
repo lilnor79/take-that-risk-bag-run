@@ -141,7 +141,7 @@ ctx.fillStyle='#f8e8b1';ctx.fillRect(16,-13,8,4);
 ctx.restore();}
 if(detected>0){ctx.fillStyle='#ff3c3c';ctx.font='bold 15px Arial';ctx.textAlign='center';ctx.fillText('🚨 '+Math.max(0,detectionLimit()-detected).toFixed(1)+'s',player.x,player.y-35)}
 drawPlayer()}
-function frame(t){const dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);draw();if(phase==='celebrate'){celebrateTime+=dt;ctx.save();ctx.setTransform(scale,0,0,scale,ox,oy);for(const p of confetti){p.x+=p.vx*dt;p.y+=p.vy*dt;p.spin+=p.vr*dt;if(p.y>H+20)p.y=-30;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.spin);ctx.fillStyle='#b8d9b4';ctx.fillRect(-12,-6,24,12);ctx.strokeStyle='#285b36';ctx.strokeRect(-10,-4,20,8);ctx.fillStyle='#1b5931';ctx.font='bold 7px Arial';ctx.textAlign='center';ctx.fillText('$100',0,2);ctx.restore()}ctx.restore()}requestAnimationFrame(frame)}requestAnimationFrame(frame);
+let simAccumulator=0;function frame(t){const dt=Math.min(.05,(t-last)/1000||0);last=t;simAccumulator=Math.min(.05,simAccumulator+dt);let steps=0;while(simAccumulator>=1/120&&steps<6){update(1/120);simAccumulator-=1/120;steps++}draw();if(phase==='celebrate'){celebrateTime+=dt;ctx.save();ctx.setTransform(scale,0,0,scale,ox,oy);for(const p of confetti){p.x+=p.vx*dt;p.y+=p.vy*dt;p.spin+=p.vr*dt;if(p.y>H+20)p.y=-30;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.spin);ctx.fillStyle='#b8d9b4';ctx.fillRect(-12,-6,24,12);ctx.strokeStyle='#285b36';ctx.strokeRect(-10,-4,20,8);ctx.fillStyle='#1b5931';ctx.font='bold 7px Arial';ctx.textAlign='center';ctx.fillText('$100',0,2);ctx.restore()}ctx.restore()}requestAnimationFrame(frame)}requestAnimationFrame(frame);
 function pointer(e){const r=canvas.getBoundingClientRect();return{x:((e.clientX-r.left)*canvas.width/r.width-ox)/scale,y:((e.clientY-r.top)*canvas.height/r.height-oy)/scale}}
 canvas.addEventListener('pointerdown',e=>{if(phase==='playing'){target=pointer(e);canvas.setPointerCapture(e.pointerId)}});canvas.addEventListener('pointermove',e=>{if(phase==='playing'&&(e.buttons||e.pressure>0))target=pointer(e)});canvas.addEventListener('pointerup',()=>target=null);canvas.addEventListener('pointercancel',()=>target=null);
 // Settings panel: movement speed and existing audio controls live together.
@@ -151,8 +151,8 @@ movementMultiplier=Math.max(.6,Math.min(2.4,movementMultiplier));
 // Cosmetic shop. Unlocks are saved on this device; no real-money purchases.
 let shopReturn='start',shopTab='character',pendingItem=null;
 const shopCSS=document.createElement('style');shopCSS.textContent=`
-#bagShopButton{position:absolute;right:14px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:10018;width:59px;height:59px;border-radius:17px;border:2px solid #c9a04e;background:linear-gradient(135deg,#47331c,#151515);color:white;font-size:29px;padding:0;box-shadow:0 0 16px #f5b94a70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
-#bagShopButton span{font-size:9px;letter-spacing:1px;color:#ffe0a1}
+#bagShopButton{position:absolute;right:14px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:10018;width:49px;height:49px;border-radius:17px;border:2px solid #c9a04e;background:linear-gradient(135deg,#47331c,#151515);color:white;font-size:24px;padding:0;box-shadow:0 0 16px #f5b94a70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+#bagShopButton span{font-size:8px;letter-spacing:1px;color:#ffe0a1}
 #shop{z-index:10021;justify-content:flex-start;overflow-y:auto;padding-top:calc(24px + env(safe-area-inset-top));gap:12px}
 #shop .shopTabs{display:flex;width:100%;max-width:360px;gap:7px}#shop .shopTabs button{flex:1;background:#303030;color:#fff;padding:11px 4px;border:1px solid #666}
 #shop .shopTabs button.active{background:#a4772d;color:#fff}
@@ -189,11 +189,11 @@ settingsStyle.textContent=`
 #bagSettingsPanel input[type=range]{width:100%;accent-color:#22d467;appearance:none;-webkit-appearance:none;background:linear-gradient(90deg,#148d47,#22d467);height:7px;border-radius:99px;padding:0;cursor:pointer}
 #bagSettingsPanel input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:30px;height:30px;border-radius:50%;border:2px solid #aaffb8;background:#073b20;box-shadow:0 0 0 3px #073b20,0 0 13px #17e877}
 #bagSettingsPanel input[type=range]::-moz-range-thumb{width:27px;height:27px;border-radius:50%;border:2px solid #aaffb8;background:#073b20}
-.bagDollarHandle{position:absolute;pointer-events:none;color:#baffc6;font-size:20px;font-weight:900;line-height:30px;text-align:center;width:30px;height:30px;text-shadow:0 0 3px #18f067;transform:translate(-50%,-50%);top:50%}
-.bagSliderWrap{position:relative;width:100%;padding:15px 0}.bagSliderWrap input{display:block}.bagSliderWrap .bagDollarHandle{top:50%}
+.bagDollarHandle{position:absolute;pointer-events:none;color:#baffc6;font-family:Arial,sans-serif;font-size:19px;font-weight:900;line-height:1;display:flex;align-items:center;justify-content:center;width:30px;height:30px;text-shadow:0 0 3px #18f067;transform:translate(-50%,-50%);top:50%;margin:0;padding:0}
+.bagSliderWrap{position:relative;width:100%;padding:15px 0;box-sizing:border-box}.bagSliderWrap input{display:block;margin:0;width:100%;height:7px}.bagSliderWrap .bagDollarHandle{top:50%}
 #bagSettingsAudio{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
 #bagSettingsAudio button{font-size:20px;padding:8px 12px;border-radius:10px;background:#333;color:white;border:1px solid #777}
-#bagSettingsAudio #musicVolume{flex:1;min-width:100px}
+#bagSettingsAudio .bagSliderWrap{flex:1;min-width:100px}
 #bagSettingsClose{width:100%;margin-top:22px;padding:12px;border-radius:11px;border:0;background:#f0f0f0;color:#111;font-weight:bold;font-size:16px}
 `;
 document.head.appendChild(settingsStyle);
@@ -214,7 +214,7 @@ slider.addEventListener('input',()=>{ensureAudioGain();if(audioContext&&audioCon
 // Home navigation: confirmation protects active runs, and banked runs can be submitted later.
 let homeOrigin='start',homeSavedScore=0;
 const homeStyle=document.createElement('style');homeStyle.textContent=`
-#bagHomeButton{position:absolute;right:84px;bottom:calc(25px + env(safe-area-inset-bottom));z-index:10017;width:52px;height:52px;padding:0;border:2px solid #7cba90;border-radius:15px;background:linear-gradient(135deg,#224b35,#111);box-shadow:0 0 14px #55de8c65;color:white;font-size:25px;display:none;align-items:center;justify-content:center}
+#bagHomeButton{position:absolute;right:72px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:10017;width:44px;height:44px;padding:0;border:2px solid #7cba90;border-radius:15px;background:linear-gradient(135deg,#224b35,#111);box-shadow:0 0 14px #55de8c65;color:white;font-size:21px;display:none;align-items:center;justify-content:center}
 #bagHomeButton.show{display:flex}
 #bagHomeDialog{position:absolute;inset:0;z-index:10025;background:#000d;display:none;align-items:center;justify-content:center;padding:22px}
 #bagHomeDialog.open{display:flex}
@@ -243,7 +243,7 @@ async function makeScoreStory(){
  g.textAlign='center';g.fillStyle='#b8ffb7';g.font='bold 39px Arial';g.fillText('LIL NOR PRESENTS',w/2,120);
  g.fillStyle='#fff';g.font='bold 104px Arial';g.fillText('TAKE THAT RISK',w/2,255);g.font='bold 66px Arial';g.fillText('BAG RUN',w/2,332);
  const gx=75,gy=405,gw=930,gh=890;g.fillStyle='#1c1c1c';g.fillRect(gx-9,gy-9,gw+18,gh+18);
- try{const source=$('game');g.drawImage(source,gx,gy,gw,gh)}catch(e){g.fillStyle='#161b17';g.fillRect(gx,gy,gw,gh)}
+ try{const source=$('game');const sw=source.width,sh=source.height;const fit=Math.min(gw/sw,gh/sh);const dw=sw*fit,dh=sh*fit;g.fillStyle='#101410';g.fillRect(gx,gy,gw,gh);g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';g.drawImage(source,gx+(gw-dw)/2,gy+(gh-dh)/2,dw,dh)}catch(e){g.fillStyle='#161b17';g.fillRect(gx,gy,gw,gh)}
  const shade=g.createLinearGradient(0,gy+gh-360,0,gy+gh);shade.addColorStop(0,'#0000');shade.addColorStop(1,'#000e');g.fillStyle=shade;g.fillRect(gx,gy+gh-360,gw,360);
  g.fillStyle='#c5ffc1';g.font='bold 45px Arial';g.fillText('BAG SECURED',w/2,1380);
  g.fillStyle='#fff';g.font='bold 125px Arial';g.fillText(fmt(score),w/2,1505);
