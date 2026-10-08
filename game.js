@@ -4,7 +4,7 @@ const W=360,H=650,exit={x:143,y:15,w:74,h:49};let scale=1,ox=0,oy=0;
 function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);scale=Math.min(canvas.width/W,canvas.height/H);ox=(canvas.width-W*scale)/2;oy=(canvas.height-H*scale)/2}addEventListener('resize',resize);resize();
 const views=['start','decision','end','leader','celebrate'];let phase='start',level=1,cash=0,score=0,hasRisked=false,points=[],guards=[],walls=[],player={x:180,y:575},target=null,elapsed=0,last=0,backTo='start',submitted=false,invincible=0,detected=0,confetti=[],celebrateTime=0;
 const fmt=n=>'$'+Math.floor(n).toLocaleString('en-US');
-const GAME_BUILD='VISIBLE-EXIT-AND-SEPARATE-HUD-V12';
+const GAME_BUILD='FAST-RAMP-CHASE-V13';
 const tiers=['SUPER EASY','EASY','MEDIUM','KINDA HARD','HARD','SUPER HARD','PRO','ADVANCED','EXPERT','ELITE','MASTER','LEGENDARY','NIGHTMARE','IMPOSSIBLE'];
 function difficulty(n){return tiers[Math.min(tiers.length-1,Math.floor((n-1)/2))]}
 
@@ -25,13 +25,13 @@ const multiplier=1+Math.floor((level-1)/5)*.45;
 const stackCount=level<=2?5:6;
 const selected=Array.from({length:stackCount},(_,i)=>template.spots[Math.round(i*(template.spots.length-1)/(stackCount-1))]);
 points=selected.map((p,i)=>({x:mirror(p[0]),y:p[1],taken:false,value:Math.floor((1800+level*520)*(1+i%3)*multiplier/100)*100}));
-guards=template.guards.map((p,i)=>({x:mirror(p[0]),y:p[1],baseX:mirror(p[0]),baseY:p[1],dir:i*2.1,phase:i*2.5,speed:.82+Math.min(3.2,level*.16),range:Math.min(68,33+level*2.1)}));
+guards=template.guards.map((p,i)=>({x:mirror(p[0]),y:p[1],baseX:mirror(p[0]),baseY:p[1],dir:i*2.1,phase:i*2.5,speed:1.05+Math.min(3.8,level*.20),range:Math.min(75,38+level*2.3),alert:0}));
 // More guards in later loops, but preserve readable routes and a safe spawn.
-if(level>3)guards.push({x:180,y:175,baseX:180,baseY:175,dir:0,phase:1.1,speed:.6+Math.min(2.6,level*.05),range:36});
-if(level>8)guards.push({x:180,y:520,baseX:180,baseY:520,dir:1,phase:2.4,speed:.7+Math.min(2.5,level*.04),range:52});
-if(level>15)guards.push({x:180,y:330,baseX:180,baseY:330,dir:2,phase:4.1,speed:.8+Math.min(2.5,level*.04),range:55});
+if(level>3)guards.push({x:180,y:175,baseX:180,baseY:175,dir:0,phase:1.1,speed:.9+Math.min(3,level*.10),range:44,alert:0});
+if(level>6)guards.push({x:180,y:520,baseX:180,baseY:520,dir:1,phase:2.4,speed:1+Math.min(3,level*.10),range:56,alert:0});
+if(level>11)guards.push({x:180,y:330,baseX:180,baseY:330,dir:2,phase:4.1,speed:1.1+Math.min(3,level*.10),range:60,alert:0});
 $('level').textContent='STAGE '+level+' · '+difficulty(level);updateHud()}
-function detectionLimit(){return Math.max(1.0,3.5-(level-1)*.28)}
+function detectionLimit(){return Math.max(.65,2.9-(level-1)*.16)}
 function updateHud(){const remaining=points.filter(p=>!p.taken).length;$('cash').textContent=fmt(cash);$('remaining').textContent=remaining+' STACKS LEFT';$('status').textContent=remaining?'EXIT LOCKED':'EXIT OPEN';$('status').style.color=remaining?'#ff8888':'#b8ffb8';$('banner').textContent='';$('timer').textContent=detected>0?'🚨 SPOTTED '+Math.max(0,detectionLimit()-detected).toFixed(1)+'s':'⏱ ESCAPE TIME '+detectionLimit().toFixed(1)+'s';$('timer').style.color=detected>0?'#ff5757':'#c7c7c7'}
 function celebrate(){phase='celebrate';target=null;celebrateTime=0;confetti=Array.from({length:85},(_,i)=>({x:Math.random()*W,y:-Math.random()*H*.7,vx:(Math.random()-.5)*80,vy:70+Math.random()*160,spin:Math.random()*6.28,vr:(Math.random()-.5)*7}));$('celebrateCash').textContent=fmt(cash);$('celebrateStage').textContent='STAGE '+level+' COMPLETE';$('celebrateNext').textContent='NEXT: STAGE '+(level+1)+' · '+difficulty(level+1);screen('celebrate')}
 function nextStage(){level++;setLevel();phase='playing';gameplay()}
@@ -41,7 +41,21 @@ function finish(bank){pauseMusic();phase='end';score=bank?cash:0;submitted=false
 function riskAgain(){hasRisked=true;phase='playing';invincible=2;elapsed=0;player={x:180,y:575};target=null;points.forEach(p=>p.taken=false);guards.forEach(g=>g.speed*=1.17);updateHud();gameplay();startMusic()}
 function update(dt){if(phase!=='playing')return;elapsed+=dt;invincible=Math.max(0,invincible-dt);const speed=140*movementMultiplier*Math.max(.79,1-cash/950000);if(target){const dx=target.x-player.x,dy=target.y-player.y,d=Math.hypot(dx,dy);if(d>4){const step=Math.min(d,speed*dt),nx=player.x+dx/d*step,ny=player.y+dy/d*step;if(!collision(nx,player.y))player.x=nx;if(!collision(player.x,ny))player.y=ny}}let changed=false;for(const p of points){if(!p.taken&&Math.hypot(player.x-p.x,player.y-p.y)<21){p.taken=true;cash+=p.value;changed=true}}if(changed)updateHud();if(points.every(p=>p.taken)&&player.y<69&&Math.abs(player.x-180)<37){celebrate();return}
 let seen=false;
-for(const g of guards){g.dir=elapsed*g.speed+g.phase;g.x=g.baseX+Math.sin(elapsed*g.speed+g.phase)*g.range;g.y=g.baseY+Math.cos(elapsed*g.speed*.65+g.phase)*12;const dx=player.x-g.x,dy=player.y-g.y,dist=Math.hypot(dx,dy),diff=Math.atan2(Math.sin(Math.atan2(dy,dx)-g.dir),Math.cos(Math.atan2(dy,dx)-g.dir));if(dist<19||(dist<76&&Math.abs(diff)<.45))seen=true}
+for(const g of guards){
+  const patrolAngle=elapsed*g.speed+g.phase;
+  const chaseUnlocked=level>=15;
+  const dx0=player.x-g.x,dy0=player.y-g.y,dist0=Math.hypot(dx0,dy0);
+  const facingDiff=Math.atan2(Math.sin(Math.atan2(dy0,dx0)-g.dir),Math.cos(Math.atan2(dy0,dx0)-g.dir));
+  const spotted=dist0<20||(dist0<Math.min(100,73+level*1.4)&&Math.abs(facingDiff)<.52);
+  if(chaseUnlocked&&invincible<=0&&spotted)g.alert=Math.max(g.alert||0,Math.min(4.2,1.5+(level-15)*.13));
+  if(chaseUnlocked&&g.alert>0){
+    g.alert=Math.max(0,g.alert-dt);
+    const dx=player.x-g.x,dy=player.y-g.y,d=Math.hypot(dx,dy);
+    if(d>1){g.dir=Math.atan2(dy,dx);const step=Math.min(d,(58+Math.min(65,(level-15)*5))*dt);const nx=g.x+dx/d*step,ny=g.y+dy/d*step;if(!collision(nx,g.y))g.x=nx;if(!collision(g.x,ny))g.y=ny}
+  }else{g.dir=patrolAngle;g.x=g.baseX+Math.sin(patrolAngle)*g.range;g.y=g.baseY+Math.cos(elapsed*g.speed*.65+g.phase)*12}
+  const dx=player.x-g.x,dy=player.y-g.y,dist=Math.hypot(dx,dy),diff=Math.atan2(Math.sin(Math.atan2(dy,dx)-g.dir),Math.cos(Math.atan2(dy,dx)-g.dir));
+  if(dist<20||(dist<Math.min(100,73+level*1.4)&&Math.abs(diff)<.52))seen=true;
+}
 if(invincible<=0&&seen){detected+=dt;if(detected>=detectionLimit()){detected=0;caught();return}}else detected=0;
 updateHud()}
 
