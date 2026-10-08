@@ -2,9 +2,17 @@
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');
 const W=360,H=650,exit={x:143,y:15,w:74,h:49};let scale=1,ox=0,oy=0;
 function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);scale=Math.min(canvas.width/W,canvas.height/H);ox=(canvas.width-W*scale)/2;oy=(canvas.height-H*scale)/2}addEventListener('resize',resize);resize();
-const views=['start','decision','end','leader','celebrate'];let phase='start',level=1,cash=0,score=0,hasRisked=false,points=[],guards=[],walls=[],player={x:180,y:575},target=null,elapsed=0,last=0,backTo='start',submitted=false,invincible=0,detected=0,confetti=[],celebrateTime=0;
+const views=['start','decision','end','leader','celebrate','shop'];let phase='start',level=1,cash=0,score=0,hasRisked=false,points=[],guards=[],walls=[],player={x:180,y:575},target=null,elapsed=0,last=0,backTo='start',submitted=false,invincible=0,detected=0,confetti=[],celebrateTime=0;
 const fmt=n=>'$'+Math.floor(n).toLocaleString('en-US');
-const GAME_BUILD='FAST-RAMP-CHASE-V13';
+const GAME_BUILD='CUSTOM-SHOP-V14';
+const SHOP_PRICES={character:[0,250000,500000,1000000,2000000],map:[0,350000,750000,1500000,3000000]};
+function shopPrice(tab,index){return SHOP_PRICES[tab][index]??Infinity;}
+const CHARACTERS=[{name:'Original Runner',coat:'#383838',hat:'#080808',pants:'#292929'},{name:'Redline',coat:'#922d32',hat:'#1b1010',pants:'#292929'},{name:'Ghost',coat:'#d1d4dc',hat:'#f0f0f0',pants:'#575d66'},{name:'Gold Rush',coat:'#9c7834',hat:'#21190a',pants:'#443822'},{name:'Night Ops',coat:'#244d3d',hat:'#090f0d',pants:'#182f26'}];
+const MAPS=[{name:'Warehouse',floor:'#181818',grid:'#252525',wall:'#454545'},{name:'Neon Vault',floor:'#111a24',grid:'#203c53',wall:'#35617a'},{name:'Red Zone',floor:'#241416',grid:'#402328',wall:'#73353b'},{name:'Money Lab',floor:'#15241c',grid:'#294637',wall:'#50735c'},{name:'Gold District',floor:'#282116',grid:'#4c3c24',wall:'#88703d'}];
+let ownedChars=JSON.parse(localStorage.getItem('bag_owned_chars')||'[0]'),ownedMaps=JSON.parse(localStorage.getItem('bag_owned_maps')||'[0]');
+let activeChar=Number(localStorage.getItem('bag_active_char')||0),activeMap=Number(localStorage.getItem('bag_active_map')||0);
+if(!CHARACTERS[activeChar]||!ownedChars.includes(activeChar))activeChar=0;
+if(!MAPS[activeMap]||!ownedMaps.includes(activeMap))activeMap=0;
 const tiers=['SUPER EASY','EASY','MEDIUM','KINDA HARD','HARD','SUPER HARD','PRO','ADVANCED','EXPERT','ELITE','MASTER','LEGENDARY','NIGHTMARE','IMPOSSIBLE'];
 function difficulty(n){return tiers[Math.min(tiers.length-1,Math.floor((n-1)/2))]}
 
@@ -61,13 +69,13 @@ updateHud()}
 
 function drawPlayer(){ctx.save();ctx.translate(player.x,player.y);if(invincible>0&&Math.floor(elapsed*12)%2)ctx.globalAlpha=.6;
 // Readable top-down silhouette: knit beanie, dark camo puffer, baggy cargos, patterned duffel.
-ctx.fillStyle='#060606';ctx.fillRect(-9,8,8,16);ctx.fillRect(2,8,8,16);ctx.fillStyle='#292929';ctx.fillRect(-11,17,11,9);ctx.fillRect(2,17,11,9);
-ctx.fillStyle='#090909';ctx.beginPath();ctx.ellipse(0,0,14,17,0,0,7);ctx.fill();ctx.fillStyle='#383838';ctx.beginPath();ctx.ellipse(0,0,11,13,0,0,7);ctx.fill();ctx.strokeStyle='#555';ctx.lineWidth=2;for(const [x,y] of [[-6,-8],[5,-7],[-5,4],[6,7]]){ctx.beginPath();ctx.moveTo(x-3,y);ctx.lineTo(x+3,y+3);ctx.stroke()}
-ctx.fillStyle='#080808';ctx.beginPath();ctx.arc(0,-13,10,0,7);ctx.fill();ctx.fillRect(-10,-20,20,7);ctx.strokeStyle='#444';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-8,-17);ctx.lineTo(8,-17);ctx.stroke();
+const outfit=CHARACTERS[activeChar];ctx.fillStyle='#060606';ctx.fillRect(-9,8,8,16);ctx.fillRect(2,8,8,16);ctx.fillStyle=outfit.pants;ctx.fillRect(-11,17,11,9);ctx.fillRect(2,17,11,9);
+ctx.fillStyle='#090909';ctx.beginPath();ctx.ellipse(0,0,14,17,0,0,7);ctx.fill();ctx.fillStyle=outfit.coat;ctx.beginPath();ctx.ellipse(0,0,11,13,0,0,7);ctx.fill();ctx.strokeStyle='#555';ctx.lineWidth=2;for(const [x,y] of [[-6,-8],[5,-7],[-5,4],[6,7]]){ctx.beginPath();ctx.moveTo(x-3,y);ctx.lineTo(x+3,y+3);ctx.stroke()}
+ctx.fillStyle=outfit.hat;ctx.beginPath();ctx.arc(0,-13,10,0,7);ctx.fill();ctx.fillRect(-10,-20,20,7);ctx.strokeStyle='#444';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-8,-17);ctx.lineTo(8,-17);ctx.stroke();
 ctx.fillStyle='#090909';ctx.fillRect(-18,-6,7,16);ctx.fillRect(11,-6,7,16);
 const b=13+Math.min(9,cash/55000);ctx.fillStyle='#050505';ctx.fillRect(17,-2,b,19);ctx.strokeStyle='#777';ctx.lineWidth=1;ctx.strokeRect(17,-2,b,19);for(let i=20;i<17+b;i+=6){ctx.beginPath();ctx.moveTo(i,2);ctx.lineTo(i+3,6);ctx.stroke()}ctx.fillStyle='#f1f1f1';ctx.font='bold 11px Arial';ctx.textAlign='center';ctx.fillText('!',17+b/2,11);ctx.restore()}
-function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#090909';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.setTransform(scale,0,0,scale,ox,oy);ctx.fillStyle='#181818';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#252525';ctx.lineWidth=1;for(let x=0;x<W;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
-ctx.fillStyle='#454545';walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h));const open=points.length&&points.every(p=>p.taken);// Large, readable exit door with a clear locked/open state.
+function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#090909';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.setTransform(scale,0,0,scale,ox,oy);const theme=MAPS[activeMap];ctx.fillStyle=theme.floor;ctx.fillRect(0,0,W,H);ctx.strokeStyle=theme.grid;ctx.lineWidth=1;for(let x=0;x<W;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+ctx.fillStyle=theme.wall;walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h));const open=points.length&&points.every(p=>p.taken);// Large, readable exit door with a clear locked/open state.
 ctx.save();ctx.shadowColor=open?'#32e56c':'#e23b43';ctx.shadowBlur=19;
 ctx.fillStyle=open?'#073e21':'#54171c';ctx.fillRect(exit.x,exit.y,exit.w,exit.h);
 ctx.shadowBlur=0;ctx.strokeStyle=open?'#50ff91':'#ff6a72';ctx.lineWidth=3;ctx.strokeRect(exit.x+1.5,exit.y+1.5,exit.w-3,exit.h-3);
@@ -109,6 +117,36 @@ canvas.addEventListener('pointerdown',e=>{if(phase==='playing'){target=pointer(e
 let movementMultiplier=Number(localStorage.getItem('bag_movement_speed')||'1');
 if(!Number.isFinite(movementMultiplier))movementMultiplier=1;
 movementMultiplier=Math.max(.6,Math.min(1.8,movementMultiplier));
+// Cosmetic shop. Unlocks are saved on this device; no real-money purchases.
+let shopReturn='start',shopTab='character',pendingItem=null;
+const shopCSS=document.createElement('style');shopCSS.textContent=`
+#bagShopButton{position:absolute;right:14px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:10018;width:59px;height:59px;border-radius:17px;border:2px solid #c9a04e;background:linear-gradient(135deg,#47331c,#151515);color:white;font-size:29px;padding:0;box-shadow:0 0 16px #f5b94a70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+#bagShopButton span{font-size:9px;letter-spacing:1px;color:#ffe0a1}
+#shop{z-index:10021;justify-content:flex-start;overflow-y:auto;padding-top:calc(24px + env(safe-area-inset-top));gap:12px}
+#shop .shopTabs{display:flex;width:100%;max-width:360px;gap:7px}#shop .shopTabs button{flex:1;background:#303030;color:#fff;padding:11px 4px;border:1px solid #666}
+#shop .shopTabs button.active{background:#a4772d;color:#fff}
+#shopGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;width:100%;max-width:360px}
+.shopCard{background:#202020;border:1px solid #565656;border-radius:12px;padding:12px 8px;display:flex;flex-direction:column;gap:8px;align-items:center;min-height:147px}
+.shopCard .shopPreview{width:74px;height:63px;border-radius:10px;border:2px solid #777;display:flex;align-items:center;justify-content:center;font-size:32px}
+.shopCard strong{font-size:12px}.shopCard button{padding:9px 5px;font-size:11px;width:100%;background:#e2b457;color:#151515}.shopCard button:disabled{background:#444;color:#aaa}
+#shopNotice{color:#f3c87e;font-size:12px;min-height:15px;max-width:330px}
+#shopConfirm{position:absolute;inset:0;background:#000d;z-index:10022;display:none;align-items:center;justify-content:center;padding:20px}
+#shopConfirm>div{background:#191919;border:1px solid #c39850;border-radius:14px;padding:22px;max-width:355px;text-align:center;display:flex;flex-direction:column;gap:13px}
+#shopConfirm h2{font-size:21px}#shopConfirm p{font-size:13px;color:#ddd;line-height:1.5;margin:0}
+`;document.head.append(shopCSS);
+const shopButton=document.createElement('button');shopButton.id='bagShopButton';shopButton.type='button';shopButton.innerHTML='👕<span>SHOP</span>';shopButton.setAttribute('aria-label','Customize characters and maps');$('app').append(shopButton);
+const shopScreen=document.createElement('div');shopScreen.id='shop';shopScreen.className='screen hidden';shopScreen.innerHTML='<div class="brand">TAKE THAT RISK</div><h2>👕 CUSTOMIZE</h2><div class="sub" id="shopBalance"></div><div class="shopTabs"><button id="shopChars" type="button">CHARACTERS</button><button id="shopMaps" type="button">MAPS</button></div><div id="shopGrid"></div><div id="shopNotice"></div><div class="panel"><button class="secondary" id="shopBack">BACK TO GAME</button></div>';$('app').append(shopScreen);
+const confirmScreen=document.createElement('div');confirmScreen.id='shopConfirm';confirmScreen.innerHTML='<div><h2>⚠️ RESET YOUR RUN?</h2><p id="shopConfirmText"></p><button class="danger" id="shopConfirmYes">UNLOCK & RESTART</button><button class="secondary" id="shopConfirmNo">CANCEL</button></div>';$('app').append(confirmScreen);
+function renderShop(){const items=shopTab==='character'?CHARACTERS:MAPS,owned=shopTab==='character'?ownedChars:ownedMaps,active=shopTab==='character'?activeChar:activeMap;$('shopBalance').textContent='IN THE BAG: '+fmt(cash)+' · UNLOCKS FROM $250,000';$('shopChars').classList.toggle('active',shopTab==='character');$('shopMaps').classList.toggle('active',shopTab==='map');$('shopGrid').replaceChildren();items.forEach((item,i)=>{const price=shopPrice(shopTab,i);const card=document.createElement('div');card.className='shopCard';const preview=document.createElement('div');preview.className='shopPreview';preview.style.background=shopTab==='character'?item.coat:item.floor;preview.textContent=shopTab==='character'?'🧥':'🗺️';const name=document.createElement('strong');name.textContent=item.name;const btn=document.createElement('button');btn.textContent=i===active?'✓ EQUIPPED':owned.includes(i)?'EQUIP':fmt(price)+' · UNLOCK';btn.disabled=i===active;btn.onclick=()=>{if(owned.includes(i)){if(shopTab==='character'){activeChar=i;localStorage.setItem('bag_active_char',String(i))}else{activeMap=i;localStorage.setItem('bag_active_map',String(i))}renderShop();return}if(cash<price){$('shopNotice').textContent='🔒 Collect '+fmt(price)+' in one run to unlock '+item.name+'.';return}pendingItem={tab:shopTab,index:i,price};$('shopConfirmText').textContent='Unlock '+item.name+' for '+fmt(price)+'? Your current run will end and you will restart at Stage 1 with $0. Your existing leaderboard entry must be removed, so you will need to earn your ranking again. Purchased items stay unlocked on this device.';confirmScreen.style.display='flex'};card.append(preview,name,btn);$('shopGrid').append(card)})}
+function openShop(){shopReturn=phase;shopTab='character';pendingItem=null;target=null;phase='shop';screen('shop');renderShop();$('shopNotice').textContent='Unlocks start at $250,000. Each item has its own price.'}
+function closeShop(){if(shopReturn==='playing'){phase='playing';gameplay()}else{phase=shopReturn;screen(shopReturn)}}
+shopButton.onclick=openShop;$('shopBack').onclick=closeShop;$('shopChars').onclick=()=>{shopTab='character';renderShop()};$('shopMaps').onclick=()=>{shopTab='map';renderShop()};$('shopConfirmNo').onclick=()=>{confirmScreen.style.display='none';pendingItem=null};
+$('shopConfirmYes').onclick=async()=>{if(!pendingItem||cash<shopPrice(pendingItem.tab,pendingItem.index))return;const button=$('shopConfirmYes');button.disabled=true;button.textContent='CHECKING LEADERBOARD…';try{
+// A leaderboard entry is only deleted when the database permits it. Never promise a reset without confirming deletion.
+if(db){const {data:{session},error:sessionError}=await db.auth.getSession();if(sessionError)throw sessionError;if(session){const result=await db.from('scores').delete().eq('user_id',session.user.id).select('user_id');if(result.error)throw result.error;const verify=await db.from('scores').select('user_id').eq('user_id',session.user.id).maybeSingle();if(verify.error)throw verify.error;if(verify.data)throw Error('Leaderboard score could not be removed. Check Supabase DELETE permissions.')}}
+const {tab,index}=pendingItem;if(tab==='character'){ownedChars=[...new Set([...ownedChars,index])];activeChar=index;localStorage.setItem('bag_owned_chars',JSON.stringify(ownedChars));localStorage.setItem('bag_active_char',String(index))}else{ownedMaps=[...new Set([...ownedMaps,index])];activeMap=index;localStorage.setItem('bag_owned_maps',JSON.stringify(ownedMaps));localStorage.setItem('bag_active_map',String(index))}localStorage.removeItem('bag_best');confirmScreen.style.display='none';pendingItem=null;begin();
+}catch(e){confirmScreen.style.display='none';$('shopNotice').textContent='Purchase canceled: '+e.message+'. Your money was not spent.'}finally{button.disabled=false;button.textContent='UNLOCK & RESTART'}};
+
 const settingsStyle=document.createElement('style');
 settingsStyle.textContent=`
 #bagSettingsButton{position:absolute;left:14px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:10020;width:43px;height:43px;padding:0;display:flex;align-items:center;justify-content:center;line-height:1;border:1px solid #666;border-radius:50%;background:#171717;color:#fff;font-size:30px;font-weight:400;cursor:pointer;box-shadow:0 2px 9px #0008}
