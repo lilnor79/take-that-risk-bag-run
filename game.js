@@ -3,8 +3,28 @@ const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('
 const W=360,H=650,exit={x:143,y:15,w:74,h:49};let scale=1,ox=0,oy=0;
 function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);scale=Math.min(canvas.width/W,canvas.height/H);ox=(canvas.width-W*scale)/2;oy=(canvas.height-H*scale)/2}addEventListener('resize',resize);resize();
 const views=['start','decision','end','leader','celebrate','shop'];let phase='start',level=1,cash=0,score=0,hasRisked=false,points=[],guards=[],walls=[],player={x:180,y:575},target=null,elapsed=0,last=0,backTo='start',submitted=false,invincible=0,detected=0,confetti=[],celebrateTime=0;
+// Fixed thumbstick, with left/right handed placement saved in settings.
+const stick={active:false,id:null,x:0,y:0,dx:0,dy:0,vx:0,vy:0};
+const STICK_RADIUS=47,STICK_DEADZONE=5;
+let joystickSide=localStorage.getItem('bag_joystick_side')==='right'?'right':'left';
+function placeStick(){stick.x=joystickSide==='right'?W-64:64;stick.y=H-150;}
+placeStick();
+function resetStick(){stick.active=false;stick.id=null;stick.dx=stick.dy=stick.vx=stick.vy=0;}
+function drawStick(){
+ if(phase!=='playing')return;
+ ctx.save();ctx.lineWidth=3;
+ ctx.fillStyle='rgba(10,22,16,.62)';ctx.strokeStyle='rgba(109,255,158,.84)';
+ ctx.shadowColor='rgba(27,241,100,.48)';ctx.shadowBlur=12;
+ ctx.beginPath();ctx.arc(stick.x,stick.y,STICK_RADIUS,0,Math.PI*2);ctx.fill();ctx.stroke();
+ ctx.shadowBlur=0;ctx.strokeStyle='rgba(190,255,206,.23)';ctx.lineWidth=1.5;
+ ctx.beginPath();ctx.arc(stick.x,stick.y,STICK_RADIUS*.67,0,Math.PI*2);ctx.stroke();
+ ctx.fillStyle='#1bd969';ctx.strokeStyle='#c5ffce';ctx.lineWidth=3;
+ ctx.shadowColor='#1de96c';ctx.shadowBlur=10;
+ ctx.beginPath();ctx.arc(stick.x+stick.dx,stick.y+stick.dy,19,0,Math.PI*2);ctx.fill();ctx.stroke();
+ ctx.restore();
+}
 const fmt=n=>'$'+Math.floor(n).toLocaleString('en-US');
-const GAME_BUILD='CASH-OUT-CHOICE-V19';
+const GAME_BUILD='JOYSTICK-AND-SLIDERS-V28';
 const SHOP_PRICES={character:[0,250000,500000,1000000,2000000],map:[0,350000,750000,1500000,3000000]};
 function shopPrice(tab,index){return SHOP_PRICES[tab][index]??Infinity;}
 const CHARACTERS=[{name:'Original Runner',coat:'#383838',hat:'#080808',pants:'#292929'},{name:'Redline',coat:'#922d32',hat:'#1b1010',pants:'#292929'},{name:'Ghost',coat:'#d1d4dc',hat:'#f0f0f0',pants:'#575d66'},{name:'Gold Rush',coat:'#9c7834',hat:'#21190a',pants:'#443822'},{name:'Night Ops',coat:'#244d3d',hat:'#090f0d',pants:'#182f26'}];
@@ -27,7 +47,7 @@ const shapes=[
 function screen(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('hud').classList.toggle('hidden',id!=='');$('banner').classList.toggle('hidden',id!=='')}
 function gameplay(){views.forEach(v=>$(v).classList.add('hidden'));$('hud').classList.remove('hidden');$('banner').classList.remove('hidden')}
 function collision(x,y){return walls.some(w=>x+10>w.x&&x-10<w.x+w.w&&y+10>w.y&&y-10<w.y+w.h)}
-function setLevel(){const template=shapes[(level-1)%5];const flip=Math.floor((level-1)/5)%2===1;const mirror=x=>flip?W-x:x;walls=[{x:0,y:0,w:12,h:H},{x:348,y:0,w:12,h:H},{x:0,y:0,w:155,h:12},{x:205,y:0,w:155,h:12},{x:0,y:638,w:360,h:12},...template.walls.map(w=>({...w,x:flip?W-w.x-w.w:w.x}))];player={x:180,y:575};target=null;elapsed=0;invincible=.9;detected=0;
+function setLevel(){const template=shapes[(level-1)%5];const flip=Math.floor((level-1)/5)%2===1;const mirror=x=>flip?W-x:x;walls=[{x:0,y:0,w:12,h:H},{x:348,y:0,w:12,h:H},{x:0,y:0,w:155,h:12},{x:205,y:0,w:155,h:12},{x:0,y:638,w:360,h:12},...template.walls.map(w=>({...w,x:flip?W-w.x-w.w:w.x}))];player={x:180,y:575};target=null;resetStick();elapsed=0;invincible=.9;detected=0;
 const multiplier=1+Math.floor((level-1)/5)*.45;
 // Shorter rounds: 5-6 stacks, spread across the map instead of 8-11.
 const stackCount=Math.min(template.spots.length,level<=2?5:6+Math.floor((level-3)/4));
@@ -43,13 +63,24 @@ for(let i=0;i<Math.min(9,Math.floor((level-14)/5));i++){const x=[75,285,105,255,
 $('level').textContent='STAGE '+level+' · '+difficulty(level);updateHud()}
 function detectionLimit(){return level>=15?Math.max(2,2.5-Math.floor((level-15)/10)*.1):Math.max(.9,3.5-Math.floor((level-1)/2)*.23)}
 function updateHud(){const remaining=points.filter(p=>!p.taken).length;$('cash').textContent=fmt(cash);$('remaining').textContent=remaining+' STACKS LEFT';$('status').textContent=remaining?'EXIT LOCKED':'EXIT OPEN';$('status').style.color=remaining?'#ff8888':'#b8ffb8';$('banner').textContent='';$('timer').textContent=detected>0?'🚨 SPOTTED '+Math.max(0,detectionLimit()-detected).toFixed(1)+'s':'⏱ ESCAPE TIME '+detectionLimit().toFixed(1)+'s';$('timer').style.color=detected>0?'#ff5757':'#c7c7c7'}
-function celebrate(){phase='celebrate';target=null;celebrateTime=0;confetti=Array.from({length:85},(_,i)=>({x:Math.random()*W,y:-Math.random()*H*.7,vx:(Math.random()-.5)*80,vy:70+Math.random()*160,spin:Math.random()*6.28,vr:(Math.random()-.5)*7}));$('celebrateCash').textContent=fmt(cash);$('celebrateStage').textContent='STAGE '+level+' COMPLETE';$('celebrateNext').textContent='NEXT: STAGE '+(level+1)+' · '+difficulty(level+1);screen('celebrate')}
+function celebrate(){phase='celebrate';target=null;resetStick();celebrateTime=0;confetti=Array.from({length:85},(_,i)=>({x:Math.random()*W,y:-Math.random()*H*.7,vx:(Math.random()-.5)*80,vy:70+Math.random()*160,spin:Math.random()*6.28,vr:(Math.random()-.5)*7}));$('celebrateCash').textContent=fmt(cash);$('celebrateStage').textContent='STAGE '+level+' COMPLETE';$('celebrateNext').textContent='NEXT: STAGE '+(level+1)+' · '+difficulty(level+1);screen('celebrate')}
 function nextStage(){level++;setLevel();phase='playing';gameplay()}
 function begin(){const audio=$('soundtrack');audio.currentTime=0;cash=0;level=1;score=0;submitted=false;hasRisked=false;phase='playing';setLevel();gameplay();startMusic()}
-function caught(){if(phase!=='playing'||invincible>0)return;target=null;if(!hasRisked){phase='decision';$('atStake').textContent=fmt(cash);screen('decision')}else{cash=0;finish(false)}}
-function finish(bank){pauseMusic();phase='end';score=bank?cash:0;submitted=false;$('endLabel').textContent=bank?'BAG SECURED':'BUSTED';$('endTitle').textContent=bank?'YOU TOOK THAT RISK':'YOU LOST THE BAG';$('finalCash').textContent=fmt(score);const best=Number(localStorage.getItem('bag_best')||0);if(score>best)localStorage.setItem('bag_best',String(score));$('best').textContent='PERSONAL BEST: '+fmt(Math.max(score,best))+' · LEVEL '+level;$('notice').textContent=score?'Enter a name to share your score.':'You lost the bag. Play again to post a score.';$('submit').disabled=score===0;$('submit').textContent='POST SCORE TO LEADERBOARD';$('username').value=localStorage.getItem('bag_name')||'';screen('end')}
-function riskAgain(){hasRisked=true;phase='playing';invincible=2;elapsed=0;player={x:180,y:575};target=null;points.forEach(p=>p.taken=false);guards.forEach(g=>g.speed*=1.17);updateHud();gameplay();startMusic()}
-function update(dt){if(phase!=='playing')return;elapsed+=dt;invincible=Math.max(0,invincible-dt);const speed=140*movementMultiplier;if(target){const dx=target.x-player.x,dy=target.y-player.y,d=Math.hypot(dx,dy);if(d>4){const step=Math.min(d,speed*dt),nx=player.x+dx/d*step,ny=player.y+dy/d*step;if(!collision(nx,player.y))player.x=nx;if(!collision(player.x,ny))player.y=ny}}let changed=false;for(const p of points){if(!p.taken&&Math.hypot(player.x-p.x,player.y-p.y)<21){p.taken=true;cash+=p.value;changed=true}}if(changed)updateHud();if(points.every(p=>p.taken)&&player.y<69&&Math.abs(player.x-180)<37){celebrate();return}
+function caught(){if(phase!=='playing'||invincible>0)return;target=null;resetStick();if(!hasRisked){phase='decision';$('atStake').textContent=fmt(cash);screen('decision')}else{cash=0;finish(false)}}
+function finish(bank){resetStick();pauseMusic();phase='end';score=bank?cash:0;submitted=false;$('endLabel').textContent=bank?'BAG SECURED':'BUSTED';$('endTitle').textContent=bank?'YOU TOOK THAT RISK':'YOU LOST THE BAG';$('finalCash').textContent=fmt(score);const best=Number(localStorage.getItem('bag_best')||0);if(score>best)localStorage.setItem('bag_best',String(score));$('best').textContent='PERSONAL BEST: '+fmt(Math.max(score,best))+' · LEVEL '+level;$('notice').textContent=score?'Enter a name to share your score.':'You lost the bag. Play again to post a score.';$('submit').disabled=score===0;$('submit').textContent='POST SCORE TO LEADERBOARD';$('username').value=localStorage.getItem('bag_name')||'';screen('end')}
+function riskAgain(){hasRisked=true;phase='playing';invincible=2;elapsed=0;player={x:180,y:575};target=null;resetStick();points.forEach(p=>p.taken=false);guards.forEach(g=>g.speed*=1.17);updateHud();gameplay();startMusic()}
+function update(dt){if(phase!=='playing')return;elapsed+=dt;invincible=Math.max(0,invincible-dt);const speed=140*movementMultiplier;
+if(stick.active){
+ const magnitude=Math.hypot(stick.dx,stick.dy);
+ const power=magnitude<=STICK_DEADZONE?0:Math.min(1,(magnitude-STICK_DEADZONE)/(STICK_RADIUS-STICK_DEADZONE));
+ const wantedX=magnitude?stick.dx/magnitude*power:0,wantedY=magnitude?stick.dy/magnitude*power:0;
+ // Responsive but gently smoothed movement, independent of screen size or finger position.
+ const easing=1-Math.exp(-23*dt);
+ stick.vx+=(wantedX-stick.vx)*easing;stick.vy+=(wantedY-stick.vy)*easing;
+ const nx=player.x+stick.vx*speed*dt,ny=player.y+stick.vy*speed*dt;
+ if(!collision(nx,player.y))player.x=Math.max(15,Math.min(W-15,nx));
+ if(!collision(player.x,ny))player.y=Math.max(15,Math.min(H-15,ny));
+}else if(target){const dx=target.x-player.x,dy=target.y-player.y,d=Math.hypot(dx,dy);if(d>4){const step=Math.min(d,speed*dt),nx=player.x+dx/d*step,ny=player.y+dy/d*step;if(!collision(nx,player.y))player.x=nx;if(!collision(player.x,ny))player.y=ny}}let changed=false;for(const p of points){if(!p.taken&&Math.hypot(player.x-p.x,player.y-p.y)<21){p.taken=true;cash+=p.value;changed=true}}if(changed)updateHud();if(points.every(p=>p.taken)&&player.y<69&&Math.abs(player.x-180)<37){celebrate();return}
 let seen=false;
 for(const g of guards){
   const patrolAngle=elapsed*g.speed+g.phase;
@@ -140,10 +171,28 @@ ctx.fillStyle='#d5dde7';ctx.fillRect(17,-10,6,16);
 ctx.fillStyle='#f8e8b1';ctx.fillRect(16,-13,8,4);
 ctx.restore();}
 if(detected>0){ctx.fillStyle='#ff3c3c';ctx.font='bold 15px Arial';ctx.textAlign='center';ctx.fillText('🚨 '+Math.max(0,detectionLimit()-detected).toFixed(1)+'s',player.x,player.y-35)}
-drawPlayer()}
+drawPlayer();drawStick()}
 let simAccumulator=0;function frame(t){const dt=Math.min(.05,(t-last)/1000||0);last=t;simAccumulator=Math.min(.05,simAccumulator+dt);let steps=0;while(simAccumulator>=1/120&&steps<6){update(1/120);simAccumulator-=1/120;steps++}draw();if(phase==='celebrate'){celebrateTime+=dt;ctx.save();ctx.setTransform(scale,0,0,scale,ox,oy);for(const p of confetti){p.x+=p.vx*dt;p.y+=p.vy*dt;p.spin+=p.vr*dt;if(p.y>H+20)p.y=-30;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.spin);ctx.fillStyle='#b8d9b4';ctx.fillRect(-12,-6,24,12);ctx.strokeStyle='#285b36';ctx.strokeRect(-10,-4,20,8);ctx.fillStyle='#1b5931';ctx.font='bold 7px Arial';ctx.textAlign='center';ctx.fillText('$100',0,2);ctx.restore()}ctx.restore()}requestAnimationFrame(frame)}requestAnimationFrame(frame);
 function pointer(e){const r=canvas.getBoundingClientRect();return{x:((e.clientX-r.left)*canvas.width/r.width-ox)/scale,y:((e.clientY-r.top)*canvas.height/r.height-oy)/scale}}
-canvas.addEventListener('pointerdown',e=>{if(phase==='playing'){target=pointer(e);canvas.setPointerCapture(e.pointerId)}});canvas.addEventListener('pointermove',e=>{if(phase==='playing'&&(e.buttons||e.pressure>0))target=pointer(e)});canvas.addEventListener('pointerup',()=>target=null);canvas.addEventListener('pointercancel',()=>target=null);
+function moveStick(e){
+ const p=pointer(e),dx=p.x-stick.x,dy=p.y-stick.y,len=Math.hypot(dx,dy),ratio=len>STICK_RADIUS?STICK_RADIUS/len:1;
+ stick.dx=dx*ratio;stick.dy=dy*ratio;
+}
+canvas.addEventListener('pointerdown',e=>{
+ if(phase!=='playing'||stick.active)return;
+ e.preventDefault();const p=pointer(e);stick.active=true;stick.id=e.pointerId;
+ // Only begin movement from the visible joystick; its location never jumps.
+ if(Math.hypot(p.x-stick.x,p.y-stick.y)>STICK_RADIUS+25){resetStick();return;}
+ stick.dx=stick.dy=stick.vx=stick.vy=0;target=null;
+ moveStick(e);canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove',e=>{
+ if(stick.active&&e.pointerId===stick.id){e.preventDefault();moveStick(e)}
+});
+function releaseStick(e){if(stick.active&&e.pointerId===stick.id){resetStick();target=null}}
+canvas.addEventListener('pointerup',releaseStick);
+canvas.addEventListener('pointercancel',releaseStick);
+canvas.addEventListener('lostpointercapture',releaseStick);
 // Settings panel: movement speed and existing audio controls live together.
 let movementMultiplier=Number(localStorage.getItem('bag_movement_speed')||'1');
 if(!Number.isFinite(movementMultiplier))movementMultiplier=1;
@@ -151,7 +200,7 @@ movementMultiplier=Math.max(.6,Math.min(2.4,movementMultiplier));
 // Cosmetic shop. Unlocks are saved on this device; no real-money purchases.
 let shopReturn='start',shopTab='character',pendingItem=null;
 const shopCSS=document.createElement('style');shopCSS.textContent=`
-#bagShopButton{position:absolute;right:14px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:10018;width:49px;height:49px;border-radius:17px;border:2px solid #c9a04e;background:linear-gradient(135deg,#47331c,#151515);color:white;font-size:24px;padding:0;box-shadow:0 0 16px #f5b94a70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+#bagShopButton{position:absolute;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:10018;width:46px;height:46px;border-radius:17px;border:2px solid #c9a04e;background:linear-gradient(135deg,#47331c,#151515);color:white;font-size:24px;padding:0;box-shadow:0 0 16px #f5b94a70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
 #bagShopButton span{font-size:8px;letter-spacing:1px;color:#ffe0a1}
 #shop{z-index:10021;justify-content:flex-start;overflow-y:auto;padding-top:calc(24px + env(safe-area-inset-top));gap:12px}
 #shop .shopTabs{display:flex;width:100%;max-width:360px;gap:7px}#shop .shopTabs button{flex:1;background:#303030;color:#fff;padding:11px 4px;border:1px solid #666}
@@ -169,7 +218,7 @@ const shopButton=document.createElement('button');shopButton.id='bagShopButton';
 const shopScreen=document.createElement('div');shopScreen.id='shop';shopScreen.className='screen hidden';shopScreen.innerHTML='<div class="brand">TAKE THAT RISK</div><h2>👕 CUSTOMIZE</h2><div class="sub" id="shopBalance"></div><div class="shopTabs"><button id="shopChars" type="button">CHARACTERS</button><button id="shopMaps" type="button">MAPS</button></div><div id="shopGrid"></div><div id="shopNotice"></div><div class="panel"><button class="secondary" id="shopBack">BACK TO GAME</button></div>';$('app').append(shopScreen);
 const confirmScreen=document.createElement('div');confirmScreen.id='shopConfirm';confirmScreen.innerHTML='<div><h2>⚠️ RESET YOUR RUN?</h2><p id="shopConfirmText"></p><button class="danger" id="shopConfirmYes">UNLOCK & RESTART</button><button class="secondary" id="shopConfirmNo">CANCEL</button></div>';$('app').append(confirmScreen);
 function renderShop(){const items=shopTab==='character'?CHARACTERS:MAPS,owned=shopTab==='character'?ownedChars:ownedMaps,active=shopTab==='character'?activeChar:activeMap;$('shopBalance').textContent='IN THE BAG: '+fmt(cash)+' · UNLOCKS FROM $250,000';$('shopChars').classList.toggle('active',shopTab==='character');$('shopMaps').classList.toggle('active',shopTab==='map');$('shopGrid').replaceChildren();items.forEach((item,i)=>{const price=shopPrice(shopTab,i);const card=document.createElement('div');card.className='shopCard';const preview=document.createElement('div');preview.className='shopPreview';preview.style.background=shopTab==='character'?item.coat:item.floor;preview.textContent=shopTab==='character'?['🧥','🧥','🥷','👑','🪖'][i]:['🏭','🌃','🚨','🧪','🏙️'][i];preview.style.boxShadow=shopTab==='map'?'inset 0 0 0 3px '+item.wall+', 0 0 14px '+item.grid:'inset 0 -14px 0 '+item.pants+', 0 0 10px '+item.coat;preview.style.borderColor=shopTab==='character'?item.hat:item.wall;const name=document.createElement('strong');name.textContent=item.name;const btn=document.createElement('button');btn.textContent=i===active?'✓ EQUIPPED':owned.includes(i)?'EQUIP':fmt(price)+' · UNLOCK';btn.disabled=i===active;btn.onclick=()=>{if(owned.includes(i)){if(shopTab==='character'){activeChar=i;localStorage.setItem('bag_active_char',String(i))}else{activeMap=i;localStorage.setItem('bag_active_map',String(i))}renderShop();return}if(cash<price){$('shopNotice').textContent='🔒 Collect '+fmt(price)+' in one run to unlock '+item.name+'.';return}pendingItem={tab:shopTab,index:i,price};$('shopConfirmText').textContent='Unlock '+item.name+' for '+fmt(price)+'? Your current run will end and you will restart at Stage 1 with $0. Your existing leaderboard entry must be removed, so you will need to earn your ranking again. Purchased items stay unlocked on this device.';confirmScreen.style.display='flex'};card.append(preview,name,btn);$('shopGrid').append(card)})}
-function openShop(){shopReturn=phase;shopTab='character';pendingItem=null;target=null;phase='shop';screen('shop');renderShop();$('shopNotice').textContent='Unlocks start at $250,000. Each item has its own price.'}
+function openShop(){resetStick();shopReturn=phase;shopTab='character';pendingItem=null;target=null;phase='shop';screen('shop');renderShop();$('shopNotice').textContent='Unlocks start at $250,000. Each item has its own price.'}
 function closeShop(){if(shopReturn==='playing'){phase='playing';gameplay()}else{phase=shopReturn;screen(shopReturn)}}
 shopButton.onclick=openShop;$('shopBack').onclick=closeShop;$('shopChars').onclick=()=>{shopTab='character';renderShop()};$('shopMaps').onclick=()=>{shopTab='map';renderShop()};$('shopConfirmNo').onclick=()=>{confirmScreen.style.display='none';pendingItem=null};
 $('shopConfirmYes').onclick=async()=>{if(!pendingItem||cash<shopPrice(pendingItem.tab,pendingItem.index))return;const button=$('shopConfirmYes');button.disabled=true;button.textContent='CHECKING LEADERBOARD…';try{
@@ -180,41 +229,45 @@ const {tab,index}=pendingItem;if(tab==='character'){ownedChars=[...new Set([...o
 
 const settingsStyle=document.createElement('style');
 settingsStyle.textContent=`
-#bagSettingsButton{position:absolute;left:14px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:10020;width:43px;height:43px;padding:0;display:flex;align-items:center;justify-content:center;line-height:1;border:1px solid #666;border-radius:50%;background:#171717;color:#fff;font-size:30px;font-weight:400;cursor:pointer;box-shadow:0 2px 9px #0008}
+#bagSettingsButton{position:absolute;left:14px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:10020;width:46px;height:46px;padding:0;display:flex;align-items:center;justify-content:center;line-height:1;border:1px solid #666;border-radius:50%;background:#171717;color:#fff;font-size:30px;font-weight:400;cursor:pointer;box-shadow:0 2px 9px #0008}
 #bagSettingsBackdrop{position:absolute;inset:0;z-index:10019;background:#000b;display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}
 #bagSettingsBackdrop.open{display:flex}
 #bagSettingsPanel{width:min(370px,100%);max-height:85vh;overflow:auto;background:#151515;border:1px solid #666;border-radius:18px;color:#fff;padding:22px;box-sizing:border-box;font-family:Arial,sans-serif;box-shadow:0 12px 45px #000}
 #bagSettingsPanel h2{margin:0 0 18px;font-size:23px}
 #bagSettingsPanel .bagSettingLabel{display:flex;justify-content:space-between;margin:16px 0 10px;font-size:15px}
 #bagSettingsPanel input[type=range]{width:100%;accent-color:#22d467;appearance:none;-webkit-appearance:none;background:linear-gradient(90deg,#148d47,#22d467);height:7px;border-radius:99px;padding:0;cursor:pointer}
-#bagSettingsPanel input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:30px;height:30px;border-radius:50%;border:2px solid #aaffb8;background:#073b20;box-shadow:0 0 0 3px #073b20,0 0 13px #17e877}
-#bagSettingsPanel input[type=range]::-moz-range-thumb{width:27px;height:27px;border-radius:50%;border:2px solid #aaffb8;background:#073b20}
-.bagDollarHandle{position:absolute;pointer-events:none;color:#baffc6;font-family:Arial,sans-serif;font-size:19px;font-weight:900;line-height:1;display:flex;align-items:center;justify-content:center;width:30px;height:30px;text-shadow:0 0 3px #18f067;transform:translate(-50%,-50%);top:50%;margin:0;padding:0}
+#bagSettingsPanel input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:30px;height:30px;border-radius:50%;border:2px solid #aaffb8;background:#073b20 url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 30 30%22%3E%3Ctext x=%2215%22 y=%2222%22 font-family=%22Arial,sans-serif%22 font-size=%2223%22 font-weight=%22900%22 fill=%22%23baffc6%22 text-anchor=%22middle%22%3E%24%3C/text%3E%3C/svg%3E") center center / 27px 27px no-repeat;box-shadow:0 0 0 3px #073b20,0 0 13px #17e877}
+#bagSettingsPanel input[type=range]::-moz-range-thumb{width:27px;height:27px;border-radius:50%;border:2px solid #aaffb8;background:#073b20 url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 30 30%22%3E%3Ctext x=%2215%22 y=%2222%22 font-family=%22Arial,sans-serif%22 font-size=%2223%22 font-weight=%22900%22 fill=%22%23baffc6%22 text-anchor=%22middle%22%3E%24%3C/text%3E%3C/svg%3E") center center / 27px 27px no-repeat}
+.bagDollarHandle{display:none!important;position:absolute;pointer-events:none;color:#baffc6;font-family:Arial,sans-serif;font-size:19px;font-weight:900;line-height:1;display:flex;align-items:center;justify-content:center;width:30px;height:30px;text-shadow:0 0 3px #18f067;transform:translate(-50%,-50%);top:50%;margin:0;padding:0}
 .bagSliderWrap{position:relative;width:100%;padding:15px 0;box-sizing:border-box}.bagSliderWrap input{display:block;margin:0;width:100%;height:7px}.bagSliderWrap .bagDollarHandle{top:50%}
 #bagSettingsAudio{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
 #bagSettingsAudio button{font-size:20px;padding:8px 12px;border-radius:10px;background:#333;color:white;border:1px solid #777}
-#bagSettingsAudio .bagSliderWrap{flex:1;min-width:100px}
-#bagSettingsClose{width:100%;margin-top:22px;padding:12px;border-radius:11px;border:0;background:#f0f0f0;color:#111;font-weight:bold;font-size:16px}
+#bagSettingsAudio .bagSliderWrap{flex:1;min-width:100px}#bagSettingsAudio input[type=range]{flex:1;min-width:90px;width:auto!important;margin:12px 0}#bagSettingsPanel input[type=range]::-webkit-slider-thumb{background-position:center center!important}
+#bagJoystickSides{display:flex;gap:10px}#bagJoystickSides button{flex:1;background:#252525;color:white;border:1px solid #555;border-radius:10px;padding:12px;font-weight:800}#bagJoystickSides button.selected{background:#105b30;border-color:#3bff89;box-shadow:0 0 10px #12a74b88}#bagSettingsClose{width:100%;margin-top:22px;padding:12px;border-radius:11px;border:0;background:#f0f0f0;color:#111;font-weight:bold;font-size:16px}
 `;
 document.head.appendChild(settingsStyle);
 const settingsButton=document.createElement('button');settingsButton.id='bagSettingsButton';settingsButton.type='button';settingsButton.textContent='⚙';settingsButton.setAttribute('aria-label','Open settings');
 const settingsBackdrop=document.createElement('div');settingsBackdrop.id='bagSettingsBackdrop';
-settingsBackdrop.innerHTML='<div id="bagSettingsPanel" role="dialog" aria-modal="true" aria-label="Game settings"><h2>⚙ SETTINGS</h2><div class="bagSettingLabel"><span>Movement Speed</span><strong id="bagSpeedPct"></strong></div><input id="bagSpeed" aria-label="Movement speed" type="range" min="60" max="240" step="5"><div class="bagSettingLabel"><span>Music Volume</span></div><div id="bagSettingsAudio"></div><button type="button" id="bagSettingsClose">BACK TO GAME</button></div>';
+settingsBackdrop.innerHTML='<div id="bagSettingsPanel" role="dialog" aria-modal="true" aria-label="Game settings"><h2>⚙ SETTINGS <span style="font-size:11px;color:#69f79b;vertical-align:middle">V28</span></h2><div class="bagSettingLabel"><span>Movement Speed</span><strong id="bagSpeedPct"></strong></div><input id="bagSpeed" aria-label="Movement speed" type="range" min="60" max="240" step="5"><div class="bagSettingLabel"><span>Joystick Side</span></div><div id="bagJoystickSides" role="group" aria-label="Joystick side"><button type="button" data-side="left">◀ LEFT</button><button type="button" data-side="right">RIGHT ▶</button></div><div class="bagSettingLabel"><span>Music Volume</span></div><div id="bagSettingsAudio"></div><button type="button" id="bagSettingsClose">BACK TO GAME</button></div>';
 $('app').append(settingsButton,settingsBackdrop);
 const speedControl=$('bagSpeed'),speedPct=$('bagSpeedPct');
+function syncJoystickSide(){document.querySelectorAll('#bagJoystickSides button').forEach(b=>{b.classList.toggle('selected',b.dataset.side===joystickSide);b.setAttribute('aria-pressed',String(b.dataset.side===joystickSide))});placeStick();resetStick();}
+document.querySelectorAll('#bagJoystickSides button').forEach(b=>b.addEventListener('click',()=>{joystickSide=b.dataset.side;localStorage.setItem('bag_joystick_side',joystickSide);syncJoystickSide()}));syncJoystickSide();
 function syncSpeed(){speedControl.value=String(Math.round(movementMultiplier*100));speedPct.textContent=Math.round(movementMultiplier*100)+'%'}
 speedControl.addEventListener('input',()=>{movementMultiplier=Number(speedControl.value)/100;localStorage.setItem('bag_movement_speed',String(movementMultiplier));syncSpeed()});syncSpeed();
 settingsButton.onclick=()=>settingsBackdrop.classList.add('open');
 $('bagSettingsClose').onclick=()=>settingsBackdrop.classList.remove('open');
 settingsBackdrop.addEventListener('click',e=>{if(e.target===settingsBackdrop)settingsBackdrop.classList.remove('open')});
 const track=$('soundtrack');track.loop=true;const slider=$('musicVolume'),toggle=$('musicToggle'),pct=$('musicPct');let volume=Number(localStorage.getItem('bag_music_volume')??60);if(!Number.isFinite(volume))volume=60;volume=Math.max(0,Math.min(100,volume));let lastVolume=volume||60;let gainNode=null,audioContext=null;function ensureAudioGain(){if(gainNode)return;try{const AudioCtx=window.AudioContext||window.webkitAudioContext;if(!AudioCtx)return;audioContext=new AudioCtx();const source=audioContext.createMediaElementSource(track);gainNode=audioContext.createGain();source.connect(gainNode);gainNode.connect(audioContext.destination)}catch(e){console.warn('Audio gain unavailable',e)}}function syncAudio(){if(gainNode){gainNode.gain.value=volume/100;track.volume=1;track.muted=false}else{track.volume=volume/100;track.muted=volume===0;}slider.value=volume;pct.textContent=volume+'%';toggle.textContent=volume?'🔊':'🔇';localStorage.setItem('bag_music_volume',String(volume))}function startMusic(){ensureAudioGain();if(audioContext&&audioContext.state==='suspended')audioContext.resume().catch(()=>{});syncAudio();track.play().catch(()=>{})}function pauseMusic(){track.pause()}const originalAudioPanel=slider.parentElement; $('bagSettingsAudio').append(toggle,slider,pct); if(originalAudioPanel&&originalAudioPanel!==document.body&&originalAudioPanel.children.length===0)originalAudioPanel.style.display='none';// Floating green dollar signs track both sliders, including on iPhone Safari.
-function dollarThumb(input){const wrap=document.createElement('div');wrap.className='bagSliderWrap';input.parentNode.insertBefore(wrap,input);wrap.appendChild(input);const sign=document.createElement('span');sign.className='bagDollarHandle';sign.textContent='$';wrap.appendChild(sign);const update=()=>{const min=Number(input.min)||0,max=Number(input.max)||100,val=Number(input.value);const fraction=(val-min)/(max-min);sign.style.left='calc('+((fraction*100).toFixed(2))+'% + '+((.5-fraction)*30).toFixed(2)+'px)'};input.addEventListener('input',update);update();return update}
+// Render the dollar sign directly inside each native slider thumb. This avoids
+// the floating overlay drifting out of sync on iPhone Safari, including startup.
+function dollarThumb(input){return ()=>{};}
 const updateSpeedDollar=dollarThumb(speedControl);const updateVolumeDollar=dollarThumb(slider);
 slider.addEventListener('input',()=>{ensureAudioGain();if(audioContext&&audioContext.state==='suspended')audioContext.resume().catch(()=>{});volume=Number(slider.value);if(volume)lastVolume=volume;syncAudio()});toggle.addEventListener('click',()=>{ensureAudioGain();if(audioContext&&audioContext.state==='suspended')audioContext.resume().catch(()=>{});volume=volume?0:lastVolume;syncAudio();if(phase==='playing')startMusic()});syncAudio();
 // Home navigation: confirmation protects active runs, and banked runs can be submitted later.
 let homeOrigin='start',homeSavedScore=0;
 const homeStyle=document.createElement('style');homeStyle.textContent=`
-#bagHomeButton{position:absolute;right:72px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:10017;width:44px;height:44px;padding:0;border:2px solid #7cba90;border-radius:15px;background:linear-gradient(135deg,#224b35,#111);box-shadow:0 0 14px #55de8c65;color:white;font-size:21px;display:none;align-items:center;justify-content:center}
+#bagHomeButton{position:absolute;right:72px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:10017;width:46px;height:46px;padding:0;border:2px solid #7cba90;border-radius:15px;background:linear-gradient(135deg,#224b35,#111);box-shadow:0 0 14px #55de8c65;color:white;font-size:21px;display:none;align-items:center;justify-content:center}
 #bagHomeButton.show{display:flex}
 #bagHomeDialog{position:absolute;inset:0;z-index:10025;background:#000d;display:none;align-items:center;justify-content:center;padding:22px}
 #bagHomeDialog.open{display:flex}
