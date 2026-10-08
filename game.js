@@ -4,6 +4,9 @@ const W=360,H=650,exit={x:155,y:8,w:50,h:30};let scale=1,ox=0,oy=0;
 function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);scale=Math.min(canvas.width/W,canvas.height/H);ox=(canvas.width-W*scale)/2;oy=(canvas.height-H*scale)/2}addEventListener('resize',resize);resize();
 const views=['start','decision','end','leader'];let phase='start',level=1,cash=0,score=0,hasRisked=false,points=[],guards=[],walls=[],player={x:180,y:575},target=null,elapsed=0,last=0,backTo='start',submitted=false,invincible=0;
 const fmt=n=>'$'+Math.floor(n).toLocaleString('en-US');
+const tiers=['SUPER EASY','EASY','MEDIUM','KINDA HARD','HARD','SUPER HARD','PRO','ADVANCED','EXPERT','ELITE','MASTER','LEGENDARY','NIGHTMARE','IMPOSSIBLE'];
+function difficulty(n){return tiers[Math.min(tiers.length-1,Math.floor((n-1)/3))]}
+
 const shapes=[
 // Each level has its own obstacles and cash pattern; the five designs repeat with scaling difficulty.
 {walls:[{x:32,y:155,w:115,h:16},{x:213,y:155,w:115,h:16},{x:32,y:350,w:115,h:16},{x:213,y:350,w:115,h:16}],spots:[[64,95],[180,105],[296,95],[88,255],[272,255],[65,450],[180,460],[295,450],[180,570]],guards:[[88,230],[270,390]]},
@@ -15,14 +18,16 @@ const shapes=[
 function screen(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('hud').classList.toggle('hidden',id!=='');$('banner').classList.toggle('hidden',id!=='')}
 function gameplay(){views.forEach(v=>$(v).classList.add('hidden'));$('hud').classList.remove('hidden');$('banner').classList.remove('hidden')}
 function collision(x,y){return walls.some(w=>x+10>w.x&&x-10<w.x+w.w&&y+10>w.y&&y-10<w.y+w.h)}
-function setLevel(){const template=shapes[(level-1)%5];walls=[{x:0,y:0,w:12,h:H},{x:348,y:0,w:12,h:H},{x:0,y:0,w:155,h:12},{x:205,y:0,w:155,h:12},{x:0,y:638,w:360,h:12},...template.walls];player={x:180,y:575};target=null;elapsed=0;invincible=1.2;hasRisked=false;
+function setLevel(){const template=shapes[(level-1)%5];const flip=Math.floor((level-1)/5)%2===1;const mirror=x=>flip?W-x:x;walls=[{x:0,y:0,w:12,h:H},{x:348,y:0,w:12,h:H},{x:0,y:0,w:155,h:12},{x:205,y:0,w:155,h:12},{x:0,y:638,w:360,h:12},...template.walls.map(w=>({...w,x:flip?W-w.x-w.w:w.x}))];player={x:180,y:575};target=null;elapsed=0;invincible=1.2;hasRisked=false;
 const multiplier=1+Math.floor((level-1)/5)*.45;
-points=template.spots.map((p,i)=>({x:p[0],y:p[1],taken:false,value:Math.floor((1800+level*520)*(1+i%3)*multiplier/100)*100}));
-guards=template.guards.map((p,i)=>({x:p[0],y:p[1],baseX:p[0],baseY:p[1],dir:i*2.1,phase:i*2.5,speed:.48+Math.min(1.2,level*.075),range:Math.min(49,24+level*1.6)}));
+points=template.spots.map((p,i)=>({x:mirror(p[0]),y:p[1],taken:false,value:Math.floor((1800+level*520)*(1+i%3)*multiplier/100)*100}));
+guards=template.guards.map((p,i)=>({x:mirror(p[0]),y:p[1],baseX:mirror(p[0]),baseY:p[1],dir:i*2.1,phase:i*2.5,speed:.48+Math.min(2.8,level*.065),range:Math.min(53,24+level*1.3)}));
 // More guards in later loops, but preserve readable routes and a safe spawn.
-if(level>5)guards.push({x:180,y:175,baseX:180,baseY:175,dir:0,phase:1.1,speed:.6+Math.min(1,level*.04),range:36});
-$('level').textContent='LEVEL '+level+' · '+(['THE LOBBY','THE CORRIDORS','THE MAZE','THE CROSSING','THE VAULT'][(level-1)%5]);updateHud()}
-function updateHud(){const remaining=points.filter(p=>!p.taken).length;$('cash').textContent=fmt(cash);$('remaining').textContent='CASH LEFT: '+remaining;$('status').textContent=remaining?'EXIT LOCKED':'EXIT OPEN';$('status').style.color=remaining?'#ff8888':'#b8ffb8';$('banner').textContent=remaining?'🔒 TOP EXIT LOCKED — '+remaining+' BUNDLES LEFT':'✓ EXIT UNLOCKED — GO TO THE TOP!'}
+if(level>5)guards.push({x:180,y:175,baseX:180,baseY:175,dir:0,phase:1.1,speed:.6+Math.min(2.6,level*.05),range:36});
+if(level>14)guards.push({x:180,y:520,baseX:180,baseY:520,dir:1,phase:2.4,speed:.7+Math.min(2.5,level*.04),range:52});
+if(level>29)guards.push({x:180,y:330,baseX:180,baseY:330,dir:2,phase:4.1,speed:.8+Math.min(2.5,level*.04),range:55});
+$('level').textContent='STAGE '+level+' · '+difficulty(level);updateHud()}
+function updateHud(){const remaining=points.filter(p=>!p.taken).length;$('cash').textContent=fmt(cash);$('remaining').textContent='CASH LEFT: '+remaining;$('status').textContent=remaining?'EXIT LOCKED':'EXIT OPEN';$('status').style.color=remaining?'#ff8888':'#b8ffb8';$('banner').textContent=remaining?'STAGE '+level+' · '+difficulty(level)+' · 🔒 '+remaining+' BUNDLES LEFT':'STAGE '+level+' · '+difficulty(level)+' · ✓ EXIT OPEN — GO TOP!'}
 function begin(){cash=0;level=1;score=0;submitted=false;phase='playing';setLevel();gameplay();startMusic()}
 function caught(){if(phase!=='playing'||invincible>0)return;target=null;if(!hasRisked){phase='decision';$('atStake').textContent=fmt(cash);screen('decision')}else{cash=0;finish(false)}}
 function finish(bank){pauseMusic();phase='end';score=bank?cash:0;submitted=false;$('endLabel').textContent=bank?'BAG SECURED':'BUSTED';$('endTitle').textContent=bank?'YOU TOOK THAT RISK':'YOU LOST THE BAG';$('finalCash').textContent=fmt(score);const best=Number(localStorage.getItem('bag_best')||0);if(score>best)localStorage.setItem('bag_best',String(score));$('best').textContent='PERSONAL BEST: '+fmt(Math.max(score,best))+' · LEVEL '+level;$('notice').textContent=score?'Enter a name to share your score.':'You lost the bag. Play again to post a score.';$('submit').disabled=score===0;$('submit').textContent='POST SCORE TO LEADERBOARD';$('username').value=localStorage.getItem('bag_name')||'';screen('end')}
@@ -38,7 +43,9 @@ ctx.fillStyle='#090909';ctx.fillRect(-18,-6,7,16);ctx.fillRect(11,-6,7,16);
 const b=13+Math.min(9,cash/55000);ctx.fillStyle='#050505';ctx.fillRect(17,-2,b,19);ctx.strokeStyle='#777';ctx.lineWidth=1;ctx.strokeRect(17,-2,b,19);for(let i=20;i<17+b;i+=6){ctx.beginPath();ctx.moveTo(i,2);ctx.lineTo(i+3,6);ctx.stroke()}ctx.fillStyle='#f1f1f1';ctx.font='bold 11px Arial';ctx.textAlign='center';ctx.fillText('!',17+b/2,11);ctx.restore()}
 function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#090909';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.setTransform(scale,0,0,scale,ox,oy);ctx.fillStyle='#181818';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#252525';ctx.lineWidth=1;for(let x=0;x<W;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
 ctx.fillStyle='#454545';walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h));const open=points.length&&points.every(p=>p.taken);ctx.fillStyle=open?'#c7ffcb':'#b33333';ctx.fillRect(exit.x,exit.y,exit.w,exit.h);ctx.fillStyle=open?'#121212':'white';ctx.font='bold 10px Arial';ctx.textAlign='center';ctx.fillText(open?'EXIT':'LOCKED',180,27);if(!open){ctx.strokeStyle='#fff';ctx.lineWidth=2;for(let i=160;i<205;i+=12){ctx.beginPath();ctx.moveTo(i,9);ctx.lineTo(i,34);ctx.stroke()}}
-for(const p of points){if(p.taken)continue;ctx.fillStyle='#eee';ctx.fillRect(p.x-13,p.y-8,26,16);ctx.fillStyle='#8c8c8c';ctx.fillRect(p.x-9,p.y-3,18,2);ctx.fillRect(p.x-9,p.y+2,18,2)}
+for(const p of points){if(p.taken)continue;
+// Bundled banknotes, with stacked paper edges, green ink, and blue $100 security band.
+ctx.save();ctx.translate(p.x,p.y);ctx.fillStyle='#617663';ctx.fillRect(-13,-5,27,16);ctx.fillStyle='#d3dfc3';ctx.fillRect(-14,-9,27,15);ctx.strokeStyle='#46664d';ctx.lineWidth=1;ctx.strokeRect(-12,-7,23,11);ctx.fillStyle='#729779';ctx.fillRect(-9,-5,17,7);ctx.fillStyle='#e1ead7';ctx.font='bold 7px Arial';ctx.textAlign='center';ctx.fillText('$100',0,1);ctx.fillStyle='#4785ba';ctx.fillRect(4,-9,4,15);ctx.fillStyle='#f0f2dc';ctx.fillRect(-13,6,26,2);ctx.fillStyle='#859b79';ctx.fillRect(-13,9,26,2);ctx.restore()}
 for(const g of guards){ctx.beginPath();ctx.moveTo(g.x,g.y);ctx.arc(g.x,g.y,76,g.dir-.45,g.dir+.45);ctx.closePath();ctx.fillStyle='#ee303044';ctx.fill();ctx.beginPath();ctx.arc(g.x,g.y,10,0,7);ctx.fillStyle='#c43535';ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 12px Arial';ctx.fillText('!',g.x,g.y+4)}drawPlayer()}
 function frame(t){const dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);draw();requestAnimationFrame(frame)}requestAnimationFrame(frame);
 function pointer(e){const r=canvas.getBoundingClientRect();return{x:((e.clientX-r.left)*canvas.width/r.width-ox)/scale,y:((e.clientY-r.top)*canvas.height/r.height-oy)/scale}}
