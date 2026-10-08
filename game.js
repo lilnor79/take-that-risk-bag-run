@@ -4,7 +4,7 @@ const W=360,H=650,exit={x:143,y:15,w:74,h:49};let scale=1,ox=0,oy=0;
 function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);scale=Math.min(canvas.width/W,canvas.height/H);ox=(canvas.width-W*scale)/2;oy=(canvas.height-H*scale)/2}addEventListener('resize',resize);resize();
 const views=['start','decision','end','leader','celebrate','shop'];let phase='start',level=1,cash=0,score=0,hasRisked=false,points=[],guards=[],walls=[],player={x:180,y:575},target=null,elapsed=0,last=0,backTo='start',submitted=false,invincible=0,detected=0,confetti=[],celebrateTime=0;
 const fmt=n=>'$'+Math.floor(n).toLocaleString('en-US');
-const GAME_BUILD='VISUAL-UPGRADE-V17';
+const GAME_BUILD='CASH-OUT-CHOICE-V19';
 const SHOP_PRICES={character:[0,250000,500000,1000000,2000000],map:[0,350000,750000,1500000,3000000]};
 function shopPrice(tab,index){return SHOP_PRICES[tab][index]??Infinity;}
 const CHARACTERS=[{name:'Original Runner',coat:'#383838',hat:'#080808',pants:'#292929'},{name:'Redline',coat:'#922d32',hat:'#1b1010',pants:'#292929'},{name:'Ghost',coat:'#d1d4dc',hat:'#f0f0f0',pants:'#575d66'},{name:'Gold Rush',coat:'#9c7834',hat:'#21190a',pants:'#443822'},{name:'Night Ops',coat:'#244d3d',hat:'#090f0d',pants:'#182f26'}];
@@ -13,7 +13,7 @@ let ownedChars=JSON.parse(localStorage.getItem('bag_owned_chars')||'[0]'),ownedM
 let activeChar=Number(localStorage.getItem('bag_active_char')||0),activeMap=Number(localStorage.getItem('bag_active_map')||0);
 if(!CHARACTERS[activeChar]||!ownedChars.includes(activeChar))activeChar=0;
 if(!MAPS[activeMap]||!ownedMaps.includes(activeMap))activeMap=0;
-const tiers=['SUPER EASY','EASY','MEDIUM','KINDA HARD','HARD','SUPER HARD','PRO','ADVANCED','EXPERT','ELITE','MASTER','LEGENDARY','NIGHTMARE','IMPOSSIBLE'];
+const tiers=['SUPER EASY','EASY','MEDIUM','KINDA HARD','HARD','SUPER HARD','PRO','LEGENDARY','IMPOSSIBLE','NIGHTMARE','ELITE','MASTER','INSANE','UNTOUCHABLE','NO MERCY','CHAOS','DANGER ZONE','MOST WANTED','FINAL BOSS','UNREAL','BEYOND IMPOSSIBLE'];
 function difficulty(n){return tiers[Math.min(tiers.length-1,Math.floor((n-1)/2))]}
 
 const shapes=[
@@ -30,7 +30,7 @@ function collision(x,y){return walls.some(w=>x+10>w.x&&x-10<w.x+w.w&&y+10>w.y&&y
 function setLevel(){const template=shapes[(level-1)%5];const flip=Math.floor((level-1)/5)%2===1;const mirror=x=>flip?W-x:x;walls=[{x:0,y:0,w:12,h:H},{x:348,y:0,w:12,h:H},{x:0,y:0,w:155,h:12},{x:205,y:0,w:155,h:12},{x:0,y:638,w:360,h:12},...template.walls.map(w=>({...w,x:flip?W-w.x-w.w:w.x}))];player={x:180,y:575};target=null;elapsed=0;invincible=.9;detected=0;
 const multiplier=1+Math.floor((level-1)/5)*.45;
 // Shorter rounds: 5-6 stacks, spread across the map instead of 8-11.
-const stackCount=level<=2?5:6;
+const stackCount=Math.min(template.spots.length,level<=2?5:6+Math.floor((level-3)/4));
 const selected=Array.from({length:stackCount},(_,i)=>template.spots[Math.round(i*(template.spots.length-1)/(stackCount-1))]);
 points=selected.map((p,i)=>({x:mirror(p[0]),y:p[1],taken:false,value:Math.floor((1800+level*520)*(1+i%3)*multiplier/100)*100}));
 guards=template.guards.map((p,i)=>({x:mirror(p[0]),y:p[1],baseX:mirror(p[0]),baseY:p[1],dir:i*2.1,phase:i*2.5,speed:1.05+Math.min(3.8,level*.20),range:Math.min(75,38+level*2.3),alert:0}));
@@ -38,8 +38,10 @@ guards=template.guards.map((p,i)=>({x:mirror(p[0]),y:p[1],baseX:mirror(p[0]),bas
 if(level>3)guards.push({x:180,y:175,baseX:180,baseY:175,dir:0,phase:1.1,speed:.9+Math.min(3,level*.10),range:44,alert:0});
 if(level>6)guards.push({x:180,y:520,baseX:180,baseY:520,dir:1,phase:2.4,speed:1+Math.min(3,level*.10),range:56,alert:0});
 if(level>11)guards.push({x:180,y:330,baseX:180,baseY:330,dir:2,phase:4.1,speed:1.1+Math.min(3,level*.10),range:60,alert:0});
+// Additional officers enter every five stages. Positions are offset to keep the spawn navigable.
+for(let i=0;i<Math.min(9,Math.floor((level-14)/5));i++){const x=[75,285,105,255,180,85,275,125,235][i],y=[130,280,390,170,440,330,510,245,360][i];guards.push({x,y,baseX:x,baseY:y,dir:i*.9,phase:i*1.7+.4,speed:1.25+Math.min(4,level*.11),range:24+i*3,alert:0});}
 $('level').textContent='STAGE '+level+' · '+difficulty(level);updateHud()}
-function detectionLimit(){return Math.max(.65,2.9-(level-1)*.16)}
+function detectionLimit(){return level>=15?Math.max(2,2.5-Math.floor((level-15)/10)*.1):Math.max(.9,3.5-Math.floor((level-1)/2)*.23)}
 function updateHud(){const remaining=points.filter(p=>!p.taken).length;$('cash').textContent=fmt(cash);$('remaining').textContent=remaining+' STACKS LEFT';$('status').textContent=remaining?'EXIT LOCKED':'EXIT OPEN';$('status').style.color=remaining?'#ff8888':'#b8ffb8';$('banner').textContent='';$('timer').textContent=detected>0?'🚨 SPOTTED '+Math.max(0,detectionLimit()-detected).toFixed(1)+'s':'⏱ ESCAPE TIME '+detectionLimit().toFixed(1)+'s';$('timer').style.color=detected>0?'#ff5757':'#c7c7c7'}
 function celebrate(){phase='celebrate';target=null;celebrateTime=0;confetti=Array.from({length:85},(_,i)=>({x:Math.random()*W,y:-Math.random()*H*.7,vx:(Math.random()-.5)*80,vy:70+Math.random()*160,spin:Math.random()*6.28,vr:(Math.random()-.5)*7}));$('celebrateCash').textContent=fmt(cash);$('celebrateStage').textContent='STAGE '+level+' COMPLETE';$('celebrateNext').textContent='NEXT: STAGE '+(level+1)+' · '+difficulty(level+1);screen('celebrate')}
 function nextStage(){level++;setLevel();phase='playing';gameplay()}
@@ -47,7 +49,7 @@ function begin(){const audio=$('soundtrack');audio.currentTime=0;cash=0;level=1;
 function caught(){if(phase!=='playing'||invincible>0)return;target=null;if(!hasRisked){phase='decision';$('atStake').textContent=fmt(cash);screen('decision')}else{cash=0;finish(false)}}
 function finish(bank){pauseMusic();phase='end';score=bank?cash:0;submitted=false;$('endLabel').textContent=bank?'BAG SECURED':'BUSTED';$('endTitle').textContent=bank?'YOU TOOK THAT RISK':'YOU LOST THE BAG';$('finalCash').textContent=fmt(score);const best=Number(localStorage.getItem('bag_best')||0);if(score>best)localStorage.setItem('bag_best',String(score));$('best').textContent='PERSONAL BEST: '+fmt(Math.max(score,best))+' · LEVEL '+level;$('notice').textContent=score?'Enter a name to share your score.':'You lost the bag. Play again to post a score.';$('submit').disabled=score===0;$('submit').textContent='POST SCORE TO LEADERBOARD';$('username').value=localStorage.getItem('bag_name')||'';screen('end')}
 function riskAgain(){hasRisked=true;phase='playing';invincible=2;elapsed=0;player={x:180,y:575};target=null;points.forEach(p=>p.taken=false);guards.forEach(g=>g.speed*=1.17);updateHud();gameplay();startMusic()}
-function update(dt){if(phase!=='playing')return;elapsed+=dt;invincible=Math.max(0,invincible-dt);const speed=140*movementMultiplier*Math.max(.79,1-cash/950000);if(target){const dx=target.x-player.x,dy=target.y-player.y,d=Math.hypot(dx,dy);if(d>4){const step=Math.min(d,speed*dt),nx=player.x+dx/d*step,ny=player.y+dy/d*step;if(!collision(nx,player.y))player.x=nx;if(!collision(player.x,ny))player.y=ny}}let changed=false;for(const p of points){if(!p.taken&&Math.hypot(player.x-p.x,player.y-p.y)<21){p.taken=true;cash+=p.value;changed=true}}if(changed)updateHud();if(points.every(p=>p.taken)&&player.y<69&&Math.abs(player.x-180)<37){celebrate();return}
+function update(dt){if(phase!=='playing')return;elapsed+=dt;invincible=Math.max(0,invincible-dt);const speed=140*movementMultiplier;if(target){const dx=target.x-player.x,dy=target.y-player.y,d=Math.hypot(dx,dy);if(d>4){const step=Math.min(d,speed*dt),nx=player.x+dx/d*step,ny=player.y+dy/d*step;if(!collision(nx,player.y))player.x=nx;if(!collision(player.x,ny))player.y=ny}}let changed=false;for(const p of points){if(!p.taken&&Math.hypot(player.x-p.x,player.y-p.y)<21){p.taken=true;cash+=p.value;changed=true}}if(changed)updateHud();if(points.every(p=>p.taken)&&player.y<69&&Math.abs(player.x-180)<37){celebrate();return}
 let seen=false;
 for(const g of guards){
   const patrolAngle=elapsed*g.speed+g.phase;
@@ -55,7 +57,7 @@ for(const g of guards){
   const dx0=player.x-g.x,dy0=player.y-g.y,dist0=Math.hypot(dx0,dy0);
   const facingDiff=Math.atan2(Math.sin(Math.atan2(dy0,dx0)-g.dir),Math.cos(Math.atan2(dy0,dx0)-g.dir));
   const spotted=dist0<20||(dist0<Math.min(100,73+level*1.4)&&Math.abs(facingDiff)<.52);
-  if(chaseUnlocked&&invincible<=0&&spotted)g.alert=Math.max(g.alert||0,Math.min(4.2,1.5+(level-15)*.13));
+  if(chaseUnlocked&&invincible<=0&&spotted){if(!(g.alert>0))detected=0;g.alert=Math.max(g.alert||0,Math.min(4.2,1.5+(level-15)*.13));}
   if(chaseUnlocked&&g.alert>0){
     g.alert=Math.max(0,g.alert-dt);
     const dx=player.x-g.x,dy=player.y-g.y,d=Math.hypot(dx,dy);
@@ -70,7 +72,7 @@ updateHud()}
 function drawPlayer(){ctx.save();ctx.translate(player.x,player.y);if(invincible>0&&Math.floor(elapsed*12)%2)ctx.globalAlpha=.6;
 const outfit=CHARACTERS[activeChar],c=activeChar;
 // Each outfit has a unique cut, accessories and material detailing while preserving its color.
-ctx.fillStyle='#070809';ctx.beginPath();ctx.ellipse(1,7,24,29,0,0,Math.PI*2);ctx.fill();
+// No oversized circular shadow behind the runner.
 ctx.fillStyle=outfit.pants;ctx.fillRect(-12,9,11,19);ctx.fillRect(2,9,11,19);
 ctx.fillStyle=c===2?'#eef1f5':c===3?'#e1b957':c===4?'#151f1b':'#101010';ctx.fillRect(-13,23,12,6);ctx.fillRect(2,23,12,6);
 ctx.fillStyle=outfit.coat;ctx.beginPath();ctx.roundRect(-16,-12,32,29,c===1?10:6);ctx.fill();
@@ -85,7 +87,16 @@ if(c===4){ctx.fillStyle='#101f17';ctx.fillRect(-12,-8,24,9);ctx.fillStyle='#5473
 ctx.fillStyle=outfit.hat;ctx.beginPath();ctx.arc(0,-17,11,0,Math.PI*2);ctx.fill();ctx.fillRect(-11,-24,22,7);
 ctx.strokeStyle=c===3?'#e1b958':c===1?'#c84a52':c===2?'#a4acba':c===4?'#4e7963':'#666';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(-10,-20);ctx.lineTo(10,-20);ctx.stroke();
 if(c===1){ctx.fillStyle='#c84a52';ctx.fillRect(-5,-27,10,3)}if(c===3){ctx.fillStyle='#ffe08c';ctx.fillRect(-4,-25,8,4)}if(c===4){ctx.fillStyle='#6a9475';ctx.fillRect(-9,-26,18,3)}
-const bagW=13+Math.min(9,cash/55000);ctx.fillStyle=c===3?'#322515':c===2?'#a5aeb9':'#08090b';ctx.beginPath();ctx.roundRect(18,-4,bagW,23,4);ctx.fill();ctx.strokeStyle=c===3?'#e7bb58':c===1?'#d94e55':c===2?'#edf2f5':c===4?'#548169':'#777';ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(20,1);ctx.lineTo(18+bagW-2,1);ctx.moveTo(20,14);ctx.lineTo(18+bagW-2,14);ctx.stroke();ctx.fillStyle='#f2f2f2';ctx.font='bold 10px Arial';ctx.textAlign='center';ctx.fillText('$',18+bagW/2,11);ctx.restore()}
+// Side-carried canvas duffel: horizontal body, handles, straps and end caps.
+ctx.save();ctx.translate(23,7);ctx.rotate(-.18);
+ctx.strokeStyle='#777';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(0,-6,8,Math.PI*1.1,Math.PI*1.9);ctx.stroke();
+ctx.fillStyle=c===3?'#47351a':c===2?'#9da6ae':c===4?'#1b3428':'#171b1e';
+ctx.beginPath();ctx.roundRect(-13,-8,28,19,7);ctx.fill();
+ctx.strokeStyle=c===3?'#dbb658':c===1?'#bb4149':c===2?'#d8e0e6':c===4?'#558a6b':'#717b82';ctx.lineWidth=2;ctx.stroke();
+ctx.strokeStyle='#2a3032';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-6,-7);ctx.lineTo(-6,10);ctx.moveTo(8,-7);ctx.lineTo(8,10);ctx.stroke();
+ctx.fillStyle='#b0a37a';ctx.fillRect(-8,-1,4,4);ctx.fillRect(6,-1,4,4);
+ctx.fillStyle='#0c1012';ctx.beginPath();ctx.ellipse(-11,1,3,7,0,0,Math.PI*2);ctx.fill();
+ctx.restore();ctx.restore()}
 function drawMapDetails(theme){const m=activeMap;ctx.save();
 // Background detail never changes obstacle collisions or guard sightlines.
 if(m===0){ctx.strokeStyle='#303030';ctx.lineWidth=2;for(let y=52;y<H;y+=160){ctx.strokeRect(18,y,34,45);ctx.strokeRect(309,y+42,32,38)}ctx.fillStyle='#3a3529';for(let y=85;y<H;y+=210){ctx.fillRect(23,y,19,4);ctx.fillRect(317,y+25,18,4)}}
@@ -136,7 +147,7 @@ canvas.addEventListener('pointerdown',e=>{if(phase==='playing'){target=pointer(e
 // Settings panel: movement speed and existing audio controls live together.
 let movementMultiplier=Number(localStorage.getItem('bag_movement_speed')||'1');
 if(!Number.isFinite(movementMultiplier))movementMultiplier=1;
-movementMultiplier=Math.max(.6,Math.min(1.8,movementMultiplier));
+movementMultiplier=Math.max(.6,Math.min(2.4,movementMultiplier));
 // Cosmetic shop. Unlocks are saved on this device; no real-money purchases.
 let shopReturn='start',shopTab='character',pendingItem=null;
 const shopCSS=document.createElement('style');shopCSS.textContent=`
@@ -175,7 +186,11 @@ settingsStyle.textContent=`
 #bagSettingsPanel{width:min(370px,100%);max-height:85vh;overflow:auto;background:#151515;border:1px solid #666;border-radius:18px;color:#fff;padding:22px;box-sizing:border-box;font-family:Arial,sans-serif;box-shadow:0 12px 45px #000}
 #bagSettingsPanel h2{margin:0 0 18px;font-size:23px}
 #bagSettingsPanel .bagSettingLabel{display:flex;justify-content:space-between;margin:16px 0 10px;font-size:15px}
-#bagSettingsPanel input[type=range]{width:100%;accent-color:#cfcfcf}
+#bagSettingsPanel input[type=range]{width:100%;accent-color:#22d467;appearance:none;-webkit-appearance:none;background:linear-gradient(90deg,#148d47,#22d467);height:7px;border-radius:99px;padding:0;cursor:pointer}
+#bagSettingsPanel input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:30px;height:30px;border-radius:50%;border:2px solid #aaffb8;background:#073b20;box-shadow:0 0 0 3px #073b20,0 0 13px #17e877}
+#bagSettingsPanel input[type=range]::-moz-range-thumb{width:27px;height:27px;border-radius:50%;border:2px solid #aaffb8;background:#073b20}
+.bagDollarHandle{position:absolute;pointer-events:none;color:#baffc6;font-size:20px;font-weight:900;line-height:30px;text-align:center;width:30px;height:30px;text-shadow:0 0 3px #18f067;transform:translate(-50%,-50%);top:50%}
+.bagSliderWrap{position:relative;width:100%;padding:15px 0}.bagSliderWrap input{display:block}.bagSliderWrap .bagDollarHandle{top:50%}
 #bagSettingsAudio{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
 #bagSettingsAudio button{font-size:20px;padding:8px 12px;border-radius:10px;background:#333;color:white;border:1px solid #777}
 #bagSettingsAudio #musicVolume{flex:1;min-width:100px}
@@ -192,7 +207,10 @@ speedControl.addEventListener('input',()=>{movementMultiplier=Number(speedContro
 settingsButton.onclick=()=>settingsBackdrop.classList.add('open');
 $('bagSettingsClose').onclick=()=>settingsBackdrop.classList.remove('open');
 settingsBackdrop.addEventListener('click',e=>{if(e.target===settingsBackdrop)settingsBackdrop.classList.remove('open')});
-const track=$('soundtrack');track.loop=true;const slider=$('musicVolume'),toggle=$('musicToggle'),pct=$('musicPct');let volume=Number(localStorage.getItem('bag_music_volume')??60);if(!Number.isFinite(volume))volume=60;volume=Math.max(0,Math.min(100,volume));let lastVolume=volume||60;function syncAudio(){track.volume=volume/100;track.muted=volume===0;slider.value=volume;pct.textContent=volume+'%';toggle.textContent=volume?'🔊':'🔇';localStorage.setItem('bag_music_volume',String(volume))}function startMusic(){track.play().catch(()=>{})}function pauseMusic(){track.pause()}const originalAudioPanel=slider.parentElement; $('bagSettingsAudio').append(toggle,slider,pct); if(originalAudioPanel&&originalAudioPanel!==document.body&&originalAudioPanel.children.length===0)originalAudioPanel.style.display='none';slider.addEventListener('input',()=>{volume=Number(slider.value);if(volume)lastVolume=volume;syncAudio()});toggle.addEventListener('click',()=>{volume=volume?0:lastVolume;syncAudio();if(phase==='playing')startMusic()});syncAudio();
+const track=$('soundtrack');track.loop=true;const slider=$('musicVolume'),toggle=$('musicToggle'),pct=$('musicPct');let volume=Number(localStorage.getItem('bag_music_volume')??60);if(!Number.isFinite(volume))volume=60;volume=Math.max(0,Math.min(100,volume));let lastVolume=volume||60;let gainNode=null,audioContext=null;function ensureAudioGain(){if(gainNode)return;try{const AudioCtx=window.AudioContext||window.webkitAudioContext;if(!AudioCtx)return;audioContext=new AudioCtx();const source=audioContext.createMediaElementSource(track);gainNode=audioContext.createGain();source.connect(gainNode);gainNode.connect(audioContext.destination)}catch(e){console.warn('Audio gain unavailable',e)}}function syncAudio(){if(gainNode){gainNode.gain.value=volume/100;track.volume=1;track.muted=false}else{track.volume=volume/100;track.muted=volume===0;}slider.value=volume;pct.textContent=volume+'%';toggle.textContent=volume?'🔊':'🔇';localStorage.setItem('bag_music_volume',String(volume))}function startMusic(){ensureAudioGain();if(audioContext&&audioContext.state==='suspended')audioContext.resume().catch(()=>{});syncAudio();track.play().catch(()=>{})}function pauseMusic(){track.pause()}const originalAudioPanel=slider.parentElement; $('bagSettingsAudio').append(toggle,slider,pct); if(originalAudioPanel&&originalAudioPanel!==document.body&&originalAudioPanel.children.length===0)originalAudioPanel.style.display='none';// Floating green dollar signs track both sliders, including on iPhone Safari.
+function dollarThumb(input){const wrap=document.createElement('div');wrap.className='bagSliderWrap';input.parentNode.insertBefore(wrap,input);wrap.appendChild(input);const sign=document.createElement('span');sign.className='bagDollarHandle';sign.textContent='$';wrap.appendChild(sign);const update=()=>{const min=Number(input.min)||0,max=Number(input.max)||100,val=Number(input.value);const fraction=(val-min)/(max-min);sign.style.left='calc('+((fraction*100).toFixed(2))+'% + '+((.5-fraction)*30).toFixed(2)+'px)'};input.addEventListener('input',update);update();return update}
+const updateSpeedDollar=dollarThumb(speedControl);const updateVolumeDollar=dollarThumb(slider);
+slider.addEventListener('input',()=>{ensureAudioGain();if(audioContext&&audioContext.state==='suspended')audioContext.resume().catch(()=>{});volume=Number(slider.value);if(volume)lastVolume=volume;syncAudio()});toggle.addEventListener('click',()=>{ensureAudioGain();if(audioContext&&audioContext.state==='suspended')audioContext.resume().catch(()=>{});volume=volume?0:lastVolume;syncAudio();if(phase==='playing')startMusic()});syncAudio();
 // Home navigation: confirmation protects active runs, and banked runs can be submitted later.
 let homeOrigin='start',homeSavedScore=0;
 const homeStyle=document.createElement('style');homeStyle.textContent=`
@@ -217,8 +235,38 @@ $('bagHomePost').onclick=()=>{phase='end';screen('end');refreshHomeButton()};$('
 const originalGameplay=gameplay;gameplay=function(){originalGameplay();refreshHomeButton();homePrompt.classList.remove('visible')};
 const originalScreen=screen;screen=function(id){originalScreen(id);refreshHomeButton()};
 const originalBegin=begin;begin=function(){homePrompt.classList.remove('visible');homeSavedScore=0;originalBegin()};
-$('nextStage').onclick=nextStage;$('play').onclick=begin;$('again').onclick=begin;$('keep').onclick=()=>finish(true);$('risk').onclick=riskAgain;
-$('share').onclick=async()=>{const name=$('username').value.trim()||'A BAG RUN PLAYER',message=`I secured ${fmt(score)} in TAKE THAT RISK: BAG RUN (Level ${level}). Can you beat my bag?`;try{if(navigator.share)await navigator.share({title:'TAKE THAT RISK: BAG RUN',text:message,url:location.protocol.startsWith('http')?location.href:undefined});else if(navigator.clipboard){await navigator.clipboard.writeText(message+' '+(location.protocol.startsWith('http')?location.href:''));$('notice').textContent='Score copied!'}else $('notice').textContent=message}catch(e){if(e.name!=='AbortError')$('notice').textContent='Could not share. Try copying your score.'}};
+$('nextStage').onclick=nextStage;$('cashOutStage').onclick=()=>{if(phase!=='celebrate')return;finish(true)};$('play').onclick=begin;$('again').onclick=begin;$('keep').onclick=()=>finish(true);$('risk').onclick=riskAgain;
+// Create a real portrait share card using the current game canvas as the artwork.
+async function makeScoreStory(){
+ const w=1080,h=1920,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+ const bg=g.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#17271b');bg.addColorStop(.45,'#080c09');bg.addColorStop(1,'#060706');g.fillStyle=bg;g.fillRect(0,0,w,h);
+ g.textAlign='center';g.fillStyle='#b8ffb7';g.font='bold 39px Arial';g.fillText('LIL NOR PRESENTS',w/2,120);
+ g.fillStyle='#fff';g.font='bold 104px Arial';g.fillText('TAKE THAT RISK',w/2,255);g.font='bold 66px Arial';g.fillText('BAG RUN',w/2,332);
+ const gx=75,gy=405,gw=930,gh=890;g.fillStyle='#1c1c1c';g.fillRect(gx-9,gy-9,gw+18,gh+18);
+ try{const source=$('game');g.drawImage(source,gx,gy,gw,gh)}catch(e){g.fillStyle='#161b17';g.fillRect(gx,gy,gw,gh)}
+ const shade=g.createLinearGradient(0,gy+gh-360,0,gy+gh);shade.addColorStop(0,'#0000');shade.addColorStop(1,'#000e');g.fillStyle=shade;g.fillRect(gx,gy+gh-360,gw,360);
+ g.fillStyle='#c5ffc1';g.font='bold 45px Arial';g.fillText('BAG SECURED',w/2,1380);
+ g.fillStyle='#fff';g.font='bold 125px Arial';g.fillText(fmt(score),w/2,1505);
+ const playerName=($('username').value.trim()||'BAG RUN PLAYER').slice(0,18).toUpperCase();
+ g.font='bold 40px Arial';g.fillStyle='#e6e6e6';g.fillText(playerName+'  •  STAGE '+level,w/2,1585);
+ g.fillStyle='#b8ffb7';g.font='bold 50px Arial';g.fillText('THINK YOU CAN BEAT MY SCORE?',w/2,1705);
+ g.fillStyle='#fff';g.font='bold 32px Arial';g.fillText('STREAM TAKE THAT RISK FREESTYLE — LIL NOR',w/2,1790);
+ g.fillStyle='#aaa';g.font='29px Arial';g.fillText('lilnor79.github.io/take-that-risk-bag-run',w/2,1860);
+ return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(Error('Image export failed')),'image/png'));
+}
+$('share').onclick=async()=>{
+ const btn=$('share');btn.disabled=true;const original=btn.textContent;btn.textContent='CREATING STORY IMAGE…';
+ try{
+  const blob=await makeScoreStory(),file=new File([blob],'take-that-risk-score.png',{type:'image/png'});
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+   await navigator.share({files:[file],title:'TAKE THAT RISK: BAG RUN',text:'Can you beat my score? Play TAKE THAT RISK: BAG RUN!'});
+  }else{
+   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='take-that-risk-score.png';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+   $('notice').textContent='Story image saved/downloaded! Share it to Instagram or Snapchat Stories.';
+  }
+ }catch(e){if(e.name!=='AbortError')$('notice').textContent='Could not create the story image: '+e.message}
+ finally{btn.disabled=false;btn.textContent=original}
+};
 const cfg=window.BAG_RUN_CONFIG||{},connected=Boolean(cfg.url&&cfg.key&&window.supabase),db=connected?window.supabase.createClient(cfg.url,cfg.key):null;
 async function leaderboard(from){backTo=from;screen('leader');$('leaderRows').textContent='Loading worldwide rankings…';$('leaderNotice').textContent='';if(!db){$('leaderRows').textContent='Leaderboard not connected yet.';$('leaderNotice').textContent='Add your Supabase project URL and publishable key to config.js.';return}try{const {data,error}=await db.from('scores').select('name,score,level').order('score',{ascending:false}).limit(100);if(error)throw error;$('leaderRows').replaceChildren();if(!data.length)$('leaderRows').textContent='No scores yet. Be the first!';data.forEach((r,i)=>{const row=document.createElement('div');row.className='leaderRow';const a=document.createElement('span'),b=document.createElement('strong');a.textContent=`${i+1}. ${r.name} · LV ${r.level}`;b.textContent=fmt(r.score);row.append(a,b);$('leaderRows').append(row)})}catch(e){$('leaderRows').textContent='Could not load leaderboard: '+e.message}}
 $('ranks').onclick=()=>leaderboard('start');$('endRanks').onclick=()=>leaderboard('end');$('back').onclick=()=>screen(backTo);
