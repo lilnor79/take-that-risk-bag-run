@@ -5,10 +5,10 @@ function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(2,devicePixe
 const views=['start','decision','end','leader','celebrate','shop'];let phase='start',level=1,cash=0,score=0,hasRisked=false,points=[],guards=[],walls=[],player={x:180,y:575},target=null,elapsed=0,last=0,backTo='start',submitted=false,invincible=0,detected=0,confetti=[],celebrateTime=0;
 // Fixed thumbstick, with left/right handed placement saved in settings.
 const stick={active:false,id:null,x:0,y:0,dx:0,dy:0,vx:0,vy:0};
-const STICK_RADIUS=47,STICK_DEADZONE=5;
+const STICK_RADIUS=39,STICK_DEADZONE=5;
 let joystickSide=localStorage.getItem('bag_joystick_side')==='right'?'right':'left';
 let controlMode=localStorage.getItem('bag_control_mode')==='free'?'free':'joystick';
-function placeStick(){stick.x=joystickSide==='right'?W-64:64;stick.y=H-150;}
+function placeStick(){stick.x=joystickSide==='right'?W-49:49;stick.y=H-49;}
 placeStick();
 function resetStick(){stick.active=false;stick.id=null;stick.dx=stick.dy=stick.vx=stick.vy=0;}
 function drawStick(){
@@ -21,11 +21,11 @@ function drawStick(){
  ctx.beginPath();ctx.arc(stick.x,stick.y,STICK_RADIUS*.67,0,Math.PI*2);ctx.stroke();
  ctx.fillStyle='#1bd969';ctx.strokeStyle='#c5ffce';ctx.lineWidth=3;
  ctx.shadowColor='#1de96c';ctx.shadowBlur=10;
- ctx.beginPath();ctx.arc(stick.x+stick.dx,stick.y+stick.dy,19,0,Math.PI*2);ctx.fill();ctx.stroke();
+ ctx.beginPath();ctx.arc(stick.x+stick.dx,stick.y+stick.dy,16,0,Math.PI*2);ctx.fill();ctx.stroke();
  ctx.restore();
 }
 const fmt=n=>'$'+Math.floor(n).toLocaleString('en-US');
-const GAME_BUILD='FREE-HAND-AND-JOYSTICK-V29';
+const GAME_BUILD='JOYSTICK-POLISH-V30';
 const SHOP_PRICES={character:[0,250000,500000,1000000,2000000],map:[0,350000,750000,1500000,3000000]};
 function shopPrice(tab,index){return SHOP_PRICES[tab][index]??Infinity;}
 const CHARACTERS=[{name:'Original Runner',coat:'#383838',hat:'#080808',pants:'#292929'},{name:'Redline',coat:'#922d32',hat:'#1b1010',pants:'#292929'},{name:'Ghost',coat:'#d1d4dc',hat:'#f0f0f0',pants:'#575d66'},{name:'Gold Rush',coat:'#9c7834',hat:'#21190a',pants:'#443822'},{name:'Night Ops',coat:'#244d3d',hat:'#090f0d',pants:'#182f26'}];
@@ -250,7 +250,7 @@ settingsStyle.textContent=`
 document.head.appendChild(settingsStyle);
 const settingsButton=document.createElement('button');settingsButton.id='bagSettingsButton';settingsButton.type='button';settingsButton.textContent='⚙';settingsButton.setAttribute('aria-label','Open settings');
 const settingsBackdrop=document.createElement('div');settingsBackdrop.id='bagSettingsBackdrop';
-settingsBackdrop.innerHTML='<div id="bagSettingsPanel" role="dialog" aria-modal="true" aria-label="Game settings"><h2>⚙ SETTINGS <span style="font-size:11px;color:#69f79b;vertical-align:middle">V29</span></h2><div class="bagSettingLabel"><span>Movement Speed</span><strong id="bagSpeedPct"></strong></div><input id="bagSpeed" aria-label="Movement speed" type="range" min="60" max="240" step="5"><div class="bagSettingLabel"><span>Control Style</span></div><div id="bagControlModes" role="group" aria-label="Movement control style"><button type="button" data-mode="joystick">🕹 JOYSTICK</button><button type="button" data-mode="free">👆 FREE HAND</button></div><div id="bagJoystickSection"><div class="bagSettingLabel"><span>Joystick Side</span></div><div id="bagJoystickSides" role="group" aria-label="Joystick side"><button type="button" data-side="left">◀ LEFT</button><button type="button" data-side="right">RIGHT ▶</button></div></div><div class="bagSettingLabel"><span>Music Volume</span></div><div id="bagSettingsAudio"></div><button type="button" id="bagSettingsClose">BACK TO GAME</button></div>';
+settingsBackdrop.innerHTML='<div id="bagSettingsPanel" role="dialog" aria-modal="true" aria-label="Game settings"><h2>⚙ SETTINGS <span style="font-size:11px;color:#69f79b;vertical-align:middle">V30</span></h2><div class="bagSettingLabel"><span>Movement Speed</span><strong id="bagSpeedPct"></strong></div><input id="bagSpeed" aria-label="Movement speed" type="range" min="60" max="240" step="5"><div class="bagSettingLabel"><span>Control Style</span></div><div id="bagControlModes" role="group" aria-label="Movement control style"><button type="button" data-mode="joystick">🕹 JOYSTICK</button><button type="button" data-mode="free">👆 FREE HAND</button></div><div id="bagJoystickSection"><div class="bagSettingLabel"><span>Joystick Side</span></div><div id="bagJoystickSides" role="group" aria-label="Joystick side"><button type="button" data-side="left">◀ LEFT</button><button type="button" data-side="right">RIGHT ▶</button></div></div><div class="bagSettingLabel"><span>Music Volume</span></div><div id="bagSettingsAudio"></div><button type="button" id="bagSettingsClose">BACK TO GAME</button></div>';
 $('app').append(settingsButton,settingsBackdrop);
 const speedControl=$('bagSpeed'),speedPct=$('bagSpeedPct');
 function syncJoystickSide(){document.querySelectorAll('#bagJoystickSides button').forEach(b=>{b.classList.toggle('selected',b.dataset.side===joystickSide);b.setAttribute('aria-pressed',String(b.dataset.side===joystickSide))});placeStick();resetStick();}
